@@ -2,69 +2,126 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sequence Route Plan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RoutePlan — Sequence Surface LLP</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;}
+/* ════════════════════════════════════════════
+   DESIGN TOKENS
+════════════════════════════════════════════ */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 :root{
   --bg:#06080d;--sf:#0c0f18;--s2:#131820;--s3:#1a2030;--s4:#212840;
   --b1:#1a2030;--b2:#253050;--b3:#334070;
   --tx:#edf0f8;--t2:#8090b8;--t3:#3f5080;
   --ac:#4f7fff;--a2:#3060e8;
-  --gn:#0fd47a;--am:#f5a623;--rd:#f04f5b;--pu:#a78bfa;
+  --gn:#0fd47a;--am:#f5a623;--rd:#f04f5b;
   --mand:#f5a623;--sugg:#0fd47a;
   --fn:'Space Grotesk',sans-serif;--mo:'JetBrains Mono',monospace;
+  /* BREAKPOINTS (reference only) */
+  --bp-sm:480px; --bp-md:768px; --bp-lg:1024px;
+  /* NAV HEIGHT changes per breakpoint */
+  --nav-h:52px;
+  --sb-w:355px;
 }
-html,body{height:100%;background:var(--bg);color:var(--tx);font-family:var(--fn);overflow:hidden;}
+html{height:100%;-webkit-text-size-adjust:100%;}
+body{height:100%;background:var(--bg);color:var(--tx);font-family:var(--fn);overflow:hidden;}
 
-/* ── NAV ── */
-nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;position:fixed;top:0;left:0;right:0;z-index:1000;}
-.brand{display:flex;align-items:center;gap:10px;}
-.blogo{width:30px;height:30px;background:linear-gradient(135deg,var(--ac),#7c3aed);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;}
-.bname{font-size:14px;font-weight:800;letter-spacing:-.02em;}
+/* ════════════════════════════════════════════
+   NAV  — stacks on mobile
+════════════════════════════════════════════ */
+nav{
+  height:var(--nav-h);background:var(--sf);border-bottom:1px solid var(--b2);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 1rem;position:fixed;top:0;left:0;right:0;z-index:1000;
+}
+.brand{display:flex;align-items:center;gap:8px;min-width:0;}
+.blogo{width:28px;height:28px;background:linear-gradient(135deg,var(--ac),#7c3aed);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.bname{font-size:13px;font-weight:800;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .bname em{color:var(--ac);font-style:normal;}
-.bsub{font-size:10px;color:var(--t3);}
-.nav-r{display:flex;align-items:center;gap:6px;}
-.pill{display:flex;align-items:center;gap:5px;background:var(--s2);border:1px solid var(--b2);border-radius:20px;padding:3px 11px;font-size:11px;color:var(--t2);font-family:var(--mo);}
+.bsub{font-size:9px;color:var(--t3);display:none;}/* hidden on mobile */
+.nav-r{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.pill{display:flex;align-items:center;gap:4px;background:var(--s2);border:1px solid var(--b2);border-radius:20px;padding:3px 10px;font-size:10px;color:var(--t2);font-family:var(--mo);white-space:nowrap;}
 .pill.hi{border-color:rgba(79,127,255,.5);color:var(--ac);}
 .pill.gn{border-color:rgba(15,212,122,.4);color:var(--gn);}
 .pill.am{border-color:rgba(245,166,35,.4);color:var(--am);}
-.ldot{width:7px;height:7px;border-radius:50%;background:var(--gn);animation:pulse 2s infinite;}
+.ldot{width:6px;height:6px;border-radius:50%;background:var(--gn);animation:pulse 2s infinite;flex-shrink:0;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-.shell{display:flex;height:calc(100vh - 52px);margin-top:52px;}
+/* HAMBURGER (mobile only) */
+.ham-btn{display:none;flex-direction:column;gap:4px;cursor:pointer;padding:6px;border-radius:7px;border:1px solid var(--b2);background:var(--s2);flex-shrink:0;}
+.ham-btn span{width:16px;height:1.5px;background:var(--t2);border-radius:2px;display:block;}
 
-/* ── SIDEBAR ── */
-.sb{width:355px;flex-shrink:0;background:var(--sf);border-right:1px solid var(--b2);display:flex;flex-direction:column;overflow:hidden;}
+/* ════════════════════════════════════════════
+   SHELL  — flex row on ≥768, stack on mobile
+════════════════════════════════════════════ */
+.shell{
+  display:flex;
+  height:calc(100vh - var(--nav-h));
+  margin-top:var(--nav-h);
+  position:relative;
+}
 
-/* UPLOAD / DOWNLOAD ZONE */
+/* ════════════════════════════════════════════
+   SIDEBAR
+════════════════════════════════════════════ */
+.sb{
+  width:var(--sb-w);flex-shrink:0;
+  background:var(--sf);border-right:1px solid var(--b2);
+  display:flex;flex-direction:column;overflow:hidden;
+  transition:transform .28s cubic-bezier(.4,0,.2,1), box-shadow .28s;
+  z-index:200;
+}
+
+/* ════════════════════════════════════════════
+   MAP AREA
+════════════════════════════════════════════ */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.mtb{
+  height:44px;background:var(--sf);border-bottom:1px solid var(--b2);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 .75rem;flex-shrink:0;gap:6px;
+}
+.tbl,.tbr{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;}
+.mbtn{
+  padding:5px 10px;border-radius:6px;font-size:11px;font-weight:500;
+  border:1px solid var(--b2);background:var(--s2);color:var(--t2);
+  cursor:pointer;transition:all .15s;font-family:var(--fn);
+  display:flex;align-items:center;gap:4px;white-space:nowrap;
+}
+.mbtn:hover,.mbtn:active{background:var(--s3);color:var(--tx);}
+.mbtn.primary{background:var(--ac);border-color:var(--ac);color:#fff;}
+.mbtn.primary:hover{background:var(--a2);}
+.mbtn.export{background:rgba(15,212,122,.12);border-color:rgba(15,212,122,.4);color:var(--gn);}
+.mbtn.export:hover{background:rgba(15,212,122,.2);}
+.mapwrap{flex:1;position:relative;}
+#map{width:100%;height:100%;}
+
+/* ════════════════════════════════════════════
+   SIDEBAR INTERNALS
+════════════════════════════════════════════ */
 .upzone{flex-shrink:0;padding:10px 12px;border-bottom:1px solid var(--b2);background:var(--s2);}
-.up-inner{border:1.5px dashed var(--b3);border-radius:10px;padding:13px 10px;display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;transition:all .2s;position:relative;text-align:center;}
+.up-inner{border:1.5px dashed var(--b3);border-radius:10px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:all .2s;position:relative;text-align:center;}
 .up-inner:hover,.up-inner.drag{border-color:var(--ac);background:rgba(79,127,255,.05);}
 .up-inner input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0;}
 .up-icon{font-size:20px;}
 .up-title{font-size:12px;font-weight:700;}
 .up-sub{font-size:10px;color:var(--t3);line-height:1.5;}
-.up-step{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:rgba(79,127,255,.1);border:1px solid rgba(79,127,255,.2);color:var(--ac);font-size:10px;font-weight:600;}
+.up-step{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;background:rgba(79,127,255,.1);border:1px solid rgba(79,127,255,.2);color:var(--ac);font-size:10px;font-weight:600;}
 .action-row{display:flex;gap:6px;margin-top:8px;}
-.act-btn{flex:1;padding:7px 6px;border-radius:8px;border:1px solid var(--b2);background:var(--s3);color:var(--t2);font-size:11px;font-family:var(--fn);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:5px;}
-.act-btn:hover{border-color:var(--ac);color:var(--ac);background:rgba(79,127,255,.07);}
+.act-btn{flex:1;padding:7px 6px;border-radius:8px;border:1px solid var(--b2);background:var(--s3);color:var(--t2);font-size:11px;font-family:var(--fn);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:4px;}
+.act-btn:hover,.act-btn:active{border-color:var(--ac);color:var(--ac);background:rgba(79,127,255,.07);}
 .act-btn.green{border-color:rgba(15,212,122,.3);color:var(--gn);}
-.act-btn.green:hover{background:rgba(15,212,122,.07);}
-
-/* PROGRESS */
-.prog-wrap{display:none;margin-top:8px;}
+.act-btn.green:hover,.act-btn.green:active{background:rgba(15,212,122,.07);}
+.prog-wrap{display:none;margin-top:7px;}
 .prog-bar{height:3px;background:var(--s3);border-radius:2px;overflow:hidden;}
 .prog-fill{height:100%;background:var(--ac);border-radius:2px;transition:width .3s;}
 .prog-txt{font-size:10px;color:var(--t2);margin-top:3px;}
-
-/* UPLOAD SUMMARY */
-.up-sum{display:none;margin-top:8px;background:var(--s3);border:1px solid var(--b2);border-radius:9px;padding:9px 11px;}
+.up-sum{display:none;margin-top:7px;background:var(--s3);border:1px solid var(--b2);border-radius:9px;padding:9px 11px;}
 .us-r{display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:4px;}
 .us-r:last-child{margin-bottom:0;}
 .us-k{color:var(--t2);}
@@ -72,70 +129,67 @@ nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:f
 .us-btns{display:flex;gap:5px;margin-top:8px;}
 .usb{flex:1;padding:6px;border-radius:7px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:11px;font-family:var(--fn);cursor:pointer;transition:all .15s;text-align:center;}
 .usb.ok{background:var(--ac);border-color:var(--ac);color:#fff;}
-.usb.ok:hover{background:var(--a2);}
-.usb:hover{border-color:var(--ac);color:var(--ac);}
+.usb.ok:hover,.usb.ok:active{background:var(--a2);}
+.usb:hover,.usb:active{border-color:var(--ac);color:var(--ac);}
 
 /* CITY TABS */
 .ctabs-wrap{flex-shrink:0;background:var(--s2);border-bottom:1px solid var(--b2);}
 .cth-row{padding:6px 12px 2px;display:flex;justify-content:space-between;align-items:center;}
 .ctl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);}
 .cth{font-size:9px;color:var(--gn);font-weight:600;}
-.ctabs{display:flex;overflow-x:auto;padding:0 8px 7px;gap:4px;scrollbar-width:none;}
+.ctabs{display:flex;overflow-x:auto;padding:0 8px 7px;gap:4px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
 .ctabs::-webkit-scrollbar{display:none;}
-.ctab{flex-shrink:0;padding:4px 10px;border-radius:7px;font-size:11px;font-weight:600;border:1px solid var(--b2);background:var(--s3);color:var(--t2);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;white-space:nowrap;position:relative;}
-.ctab:hover{border-color:var(--ac);}
+.ctab{flex-shrink:0;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;border:1px solid var(--b2);background:var(--s3);color:var(--t2);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;white-space:nowrap;position:relative;min-height:32px;}
 .ctab.on{background:var(--s4);border-color:var(--b3);color:var(--tx);}
 .ctab.on::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:55%;height:2px;border-radius:2px;background:var(--ac);}
 .cdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .cbadge{min-width:16px;height:16px;border-radius:8px;padding:0 4px;font-size:9px;font-weight:800;font-family:var(--mo);display:flex;align-items:center;justify-content:center;background:var(--ac);color:#fff;}
 
 /* SEL STRIP */
-.selstrip{flex-shrink:0;padding:5px 12px;border-bottom:1px solid var(--b2);background:var(--sf);display:flex;align-items:center;gap:5px;overflow-x:auto;scrollbar-width:none;min-height:32px;}
+.selstrip{flex-shrink:0;padding:5px 12px;border-bottom:1px solid var(--b2);background:var(--sf);display:flex;align-items:center;gap:5px;overflow-x:auto;scrollbar-width:none;min-height:32px;-webkit-overflow-scrolling:touch;}
 .selstrip::-webkit-scrollbar{display:none;}
 .ssl{font-size:10px;color:var(--t3);white-space:nowrap;font-weight:600;flex-shrink:0;}
 .sschip{display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;white-space:nowrap;cursor:pointer;border:1px solid transparent;flex-shrink:0;}
-.sschip:hover{opacity:.75;}
 .ssempty{font-size:10px;color:var(--t3);font-style:italic;}
 
 /* FILTERS */
 .frow{padding:5px 12px;border-bottom:1px solid var(--b2);display:flex;flex-direction:column;gap:4px;flex-shrink:0;}
 .fg{display:flex;align-items:center;gap:3px;flex-wrap:wrap;}
 .fl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);min-width:36px;}
-.chip{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;border:1px solid var(--b2);background:var(--s2);color:var(--t2);cursor:pointer;transition:all .15s;white-space:nowrap;user-select:none;}
-.chip:hover{border-color:var(--ac);}
+.chip{padding:3px 8px;border-radius:10px;font-size:11px;font-weight:500;border:1px solid var(--b2);background:var(--s2);color:var(--t2);cursor:pointer;transition:all .15s;white-space:nowrap;user-select:none;min-height:26px;}
 .chip.on{background:var(--ac);border-color:var(--ac);color:#fff;}
 
 /* SEARCH */
 .swrap{padding:5px 12px;border-bottom:1px solid var(--b2);flex-shrink:0;}
-.sinput{width:100%;background:var(--s2);border:1px solid var(--b2);border-radius:7px;padding:6px 10px 6px 29px;font-size:12px;color:var(--tx);font-family:var(--fn);outline:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 16 16' stroke='%233f5080' stroke-width='1.5'%3E%3Ccircle cx='6.5' cy='6.5' r='4'/%3E%3Cpath d='M10 10l3 3'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:8px center;background-size:13px;transition:border-color .15s;}
+.sinput{width:100%;background:var(--s2);border:1px solid var(--b2);border-radius:7px;padding:8px 10px 8px 30px;font-size:12px;color:var(--tx);font-family:var(--fn);outline:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 16 16' stroke='%233f5080' stroke-width='1.5'%3E%3Ccircle cx='6.5' cy='6.5' r='4'/%3E%3Cpath d='M10 10l3 3'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:8px center;background-size:13px;-webkit-appearance:none;}
 .sinput:focus{border-color:var(--ac);}
 .sinput::placeholder{color:var(--t3);}
 
-/* LIST */
-.dlist{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--b2) transparent;}
+/* DEALER LIST */
+.dlist{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--b2) transparent;}
 .dlist::-webkit-scrollbar{width:3px;}
 .dlist::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px;}
 .ghdr{position:sticky;top:0;z-index:5;padding:4px 12px;background:var(--s3);border-bottom:1px solid var(--b2);display:flex;align-items:center;justify-content:space-between;}
 .gcity{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;}
 .gacts{display:flex;gap:4px;align-items:center;}
-.gbtn{font-size:9px;padding:2px 7px;border-radius:5px;border:1px solid var(--b2);background:transparent;color:var(--t2);cursor:pointer;font-family:var(--fn);transition:all .12s;}
-.gbtn:hover{border-color:var(--ac);color:var(--ac);}
-.drow{display:flex;align-items:flex-start;gap:9px;padding:8px 12px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .1s;position:relative;}
+.gbtn{font-size:9px;padding:3px 8px;border-radius:5px;border:1px solid var(--b2);background:transparent;color:var(--t2);cursor:pointer;font-family:var(--fn);min-height:24px;}
+.drow{display:flex;align-items:flex-start;gap:9px;padding:9px 12px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .1s;position:relative;min-height:54px;}
 .drow:hover{background:var(--s2);}
+.drow:active{background:var(--s3);}
 .drow.picked{background:rgba(79,127,255,.07);}
 .drow.picked::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--ac);}
 .drow.mand-row{background:rgba(245,166,35,.05);}
 .drow.mand-row.picked{background:rgba(245,166,35,.1);}
 .drow.mand-row::before,.drow.mand-row.picked::before{background:var(--mand)!important;}
 .drow.sugg-row{background:rgba(15,212,122,.04);}
-.dchk{width:18px;height:18px;border:1.5px solid var(--b3);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;transition:all .12s;}
+.dchk{width:20px;height:20px;border:1.5px solid var(--b3);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;transition:all .12s;}
 .drow.picked .dchk{background:var(--ac);border-color:var(--ac);}
 .drow.mand-row.picked .dchk{background:var(--mand);border-color:var(--mand);}
-.dchk svg{display:none;width:10px;height:10px;stroke:white;stroke-width:2.5;fill:none;}
+.dchk svg{display:none;width:11px;height:11px;stroke:white;stroke-width:2.5;fill:none;}
 .drow.picked .dchk svg{display:block;}
 .dbody{flex:1;min-width:0;}
-.dname{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;}
-.dmeta{font-size:10px;color:var(--t3);margin-top:2px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;}
+.dname{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;}
+.dmeta{font-size:10px;color:var(--t3);margin-top:3px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;}
 .dinfo{font-family:var(--mo);font-size:10px;color:var(--gn);margin-top:2px;}
 .mtag{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:6px;font-size:9px;font-weight:700;background:rgba(245,166,35,.15);color:var(--mand);border:1px solid rgba(245,166,35,.3);}
 .stag{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:6px;font-size:9px;font-weight:700;background:rgba(15,212,122,.12);color:var(--gn);border:1px solid rgba(15,212,122,.25);}
@@ -144,18 +198,17 @@ nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:f
 .sp-ach{background:#002d1a;color:#0fd47a;border:1px solid #005c35;}
 .sp-act{background:#001c3a;color:#4f7fff;border:1px solid #003580;}
 .sp-ina{background:#2d0c0f;color:#f04f5b;border:1px solid #5c1a20;}
-.info-btn{font-size:11px;color:var(--t3);cursor:pointer;padding:2px 5px;border-radius:4px;border:1px solid var(--b2);flex-shrink:0;transition:all .12s;margin-top:1px;}
-.info-btn:hover{border-color:var(--ac);color:var(--ac);}
+.info-btn{font-size:11px;color:var(--t3);cursor:pointer;padding:3px 6px;border-radius:4px;border:1px solid var(--b2);flex-shrink:0;transition:all .12s;margin-top:1px;min-height:24px;display:flex;align-items:center;}
 
 /* RESULT PANEL */
-.rpanel{border-bottom:1px solid var(--b2);flex-shrink:0;background:var(--s2);max-height:40vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--b2) transparent;display:none;}
+.rpanel{border-bottom:1px solid var(--b2);flex-shrink:0;background:var(--s2);max-height:38vh;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--b2) transparent;display:none;}
 .rpanel::-webkit-scrollbar{width:3px;}
 .rpanel::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px;}
 .rphdr{position:sticky;top:0;background:var(--s2);padding:7px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b2);z-index:10;}
 .rptitle{font-size:11px;font-weight:700;color:var(--t2);}
 .rpmeta{font-size:10px;font-family:var(--mo);color:var(--t3);}
 .dayblock{border-bottom:1px solid var(--b2);}
-.dayhdr{display:flex;align-items:center;gap:7px;padding:6px 12px;background:var(--s3);border-bottom:1px solid var(--b2);cursor:pointer;user-select:none;}
+.dayhdr{display:flex;align-items:center;gap:7px;padding:7px 12px;background:var(--s3);border-bottom:1px solid var(--b2);cursor:pointer;user-select:none;min-height:42px;}
 .daynum{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;font-family:var(--mo);flex-shrink:0;}
 .dayinfo{flex:1;}
 .daytitle{font-size:12px;font-weight:700;}
@@ -167,8 +220,8 @@ nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:f
 .trroute{font-size:11px;font-weight:600;color:var(--t2);}
 .trmeta{font-size:10px;color:var(--t3);}
 .trdist{font-family:var(--mo);font-size:10px;color:var(--ac);}
-.stoprow{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .1s;}
-.stoprow:hover{background:var(--s3);}
+.stoprow{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .1s;min-height:42px;}
+.stoprow:hover,.stoprow:active{background:var(--s3);}
 .stoprow:last-child{border-bottom:none;}
 .snum{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;font-family:var(--mo);flex-shrink:0;color:#000;}
 .sbody{flex:1;min-width:0;}
@@ -182,37 +235,26 @@ nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:f
 .fsel{font-size:11px;color:var(--t2);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:3px;}
 .fsel b{color:var(--ac);}
 .fsub{font-size:10px;color:var(--t3);}
-.planbtn{width:100%;padding:10px;border-radius:8px;background:var(--ac);border:none;color:#fff;font-size:13px;font-weight:700;font-family:var(--fn);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px;}
-.planbtn:hover{background:var(--a2);}
+.planbtn{width:100%;padding:11px;border-radius:8px;background:var(--ac);border:none;color:#fff;font-size:13px;font-weight:700;font-family:var(--fn);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;}
+.planbtn:hover,.planbtn:active{background:var(--a2);}
 .planbtn:disabled{opacity:.3;cursor:not-allowed;}
 .f2{display:flex;gap:4px;margin-top:5px;}
-.fbtn{flex:1;padding:5px;border-radius:6px;border:1px solid var(--b2);background:transparent;color:var(--t3);font-size:10px;font-family:var(--fn);cursor:pointer;transition:all .15s;text-align:center;}
-.fbtn:hover{border-color:var(--ac);color:var(--ac);}
-.fbtn.danger:hover{border-color:var(--rd);color:var(--rd);}
+.fbtn{flex:1;padding:6px;border-radius:6px;border:1px solid var(--b2);background:transparent;color:var(--t3);font-size:10px;font-family:var(--fn);cursor:pointer;transition:all .15s;text-align:center;min-height:32px;}
+.fbtn:hover,.fbtn:active{border-color:var(--ac);color:var(--ac);}
+.fbtn.danger:hover,.fbtn.danger:active{border-color:var(--rd);color:var(--rd);}
 
-/* MAP AREA */
-.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
-.mtb{height:44px;background:var(--sf);border-bottom:1px solid var(--b2);display:flex;align-items:center;justify-content:space-between;padding:0 1rem;flex-shrink:0;}
-.tbl,.tbr{display:flex;align-items:center;gap:5px;}
-.mbtn{padding:5px 11px;border-radius:6px;font-size:12px;font-weight:500;border:1px solid var(--b2);background:var(--s2);color:var(--t2);cursor:pointer;transition:all .15s;font-family:var(--fn);display:flex;align-items:center;gap:4px;}
-.mbtn:hover{background:var(--s3);color:var(--tx);}
-.mbtn.primary{background:var(--ac);border-color:var(--ac);color:#fff;}
-.mbtn.primary:hover{background:var(--a2);}
-.mbtn.export{background:rgba(15,212,122,.12);border-color:rgba(15,212,122,.4);color:var(--gn);}
-.mbtn.export:hover{background:rgba(15,212,122,.2);}
-.mapwrap{flex:1;position:relative;}
-#map{width:100%;height:100%;}
-
-/* OVERLAYS */
+/* ════════════════════════════════════════════
+   MAP OVERLAYS
+════════════════════════════════════════════ */
 .ovl{position:absolute;z-index:500;background:rgba(6,8,13,.97);border:1px solid var(--b2);border-radius:11px;backdrop-filter:blur(14px);}
 
 /* DETAIL PANEL */
-#dp{top:12px;right:14px;width:295px;display:none;max-height:calc(100vh - 120px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--b2) transparent;}
+#dp{top:12px;right:12px;width:290px;display:none;max-height:calc(100% - 24px);overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--b2) transparent;}
 #dp::-webkit-scrollbar{width:3px;}
 #dp::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px;}
 #dp.show{display:block;}
-.dpi{padding:14px 15px;}
-.dpclose{float:right;background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px;line-height:1;margin-top:-2px;}
+.dpi{padding:14px 14px;}
+.dpclose{float:right;background:none;border:none;color:var(--t3);cursor:pointer;font-size:20px;line-height:1;margin-top:-2px;padding:2px 4px;}
 .dp-tags{display:flex;align-items:center;gap:5px;margin-bottom:6px;flex-wrap:wrap;}
 .dp-ctag{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.05em;}
 .dp-ktag{font-size:9px;padding:2px 6px;border-radius:4px;background:var(--s3);color:var(--t2);border:1px solid var(--b2);}
@@ -229,91 +271,222 @@ nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:f
 .pfill{height:100%;border-radius:2px;}
 .whybox{margin-top:8px;padding:8px 10px;background:rgba(79,127,255,.06);border:1px solid rgba(79,127,255,.18);border-radius:7px;font-size:10px;color:var(--t2);line-height:1.6;}
 .why-t{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ac);margin-bottom:4px;}
-.dp-act{width:100%;margin-top:10px;padding:8px;border-radius:7px;background:transparent;border:1px solid var(--b2);color:var(--t2);font-size:11px;font-family:var(--fn);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:5px;}
-.dp-act:hover{border-color:var(--ac);color:var(--ac);}
+.dp-act{width:100%;margin-top:10px;padding:10px;border-radius:7px;background:transparent;border:1px solid var(--b2);color:var(--t2);font-size:11px;font-family:var(--fn);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:5px;min-height:40px;}
+.dp-act:hover,.dp-act:active{border-color:var(--ac);color:var(--ac);}
 .dp-act.on{background:rgba(79,127,255,.1);border-color:var(--ac);color:var(--ac);}
 .nearby-sec{margin-top:10px;padding:8px 10px;background:rgba(15,212,122,.05);border:1px solid rgba(15,212,122,.2);border-radius:7px;}
 .nearby-t{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--gn);margin-bottom:6px;}
-.nitem{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid rgba(15,212,122,.1);cursor:pointer;}
+.nitem{display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid rgba(15,212,122,.1);cursor:pointer;min-height:32px;}
 .nitem:last-child{border-bottom:none;}
-.nitem:hover .nname{color:var(--gn);}
 .nname{font-size:11px;font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .nkm{font-family:var(--mo);font-size:9px;color:var(--gn);}
-.nadd{font-size:11px;color:var(--ac);flex-shrink:0;cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid rgba(79,127,255,.3);}
-.nadd:hover{background:rgba(79,127,255,.1);}
+.nadd{font-size:11px;color:var(--ac);flex-shrink:0;cursor:pointer;padding:3px 6px;border-radius:3px;border:1px solid rgba(79,127,255,.3);min-height:24px;display:flex;align-items:center;}
 
 /* LEGEND */
-#legend{bottom:14px;right:14px;padding:10px 12px;min-width:168px;}
+#legend{bottom:14px;right:12px;padding:10px 12px;min-width:160px;}
 .leg-t{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:7px;}
 .leg-i{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--t2);margin-bottom:4px;}
 .leg-d{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .leg-s{border-top:1px solid var(--b2);margin:5px 0 4px;}
 
 /* ROUTE SUMMARY */
-#rsum{bottom:14px;left:50%;transform:translateX(-50%);padding:9px 18px;display:none;align-items:center;gap:14px;white-space:nowrap;}
+#rsum{bottom:14px;left:50%;transform:translateX(-50%);padding:9px 16px;display:none;align-items:center;gap:12px;white-space:nowrap;}
 .ri{display:flex;flex-direction:column;align-items:center;gap:1px;}
 .rv{font-family:var(--mo);font-weight:600;font-size:13px;}
 .rl{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;}
-.rsep{width:1px;height:24px;background:var(--b2);}
+.rsep{width:1px;height:22px;background:var(--b2);}
 
-/* PDF MODAL */
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;display:flex;align-items:center;justify-content:center;display:none;}
+/* ════════════════════════════════════════════
+   MODAL (PDF EXPORT)
+════════════════════════════════════════════ */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;display:none;align-items:center;justify-content:center;padding:16px;}
 .modal-bg.show{display:flex;}
-.modal{background:var(--sf);border:1px solid var(--b2);border-radius:14px;padding:24px;width:420px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal{background:var(--sf);border:1px solid var(--b2);border-radius:14px;padding:22px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .modal-title{font-size:16px;font-weight:800;margin-bottom:4px;}
-.modal-sub{font-size:12px;color:var(--t3);margin-bottom:18px;}
-.modal-section{margin-bottom:16px;}
-.modal-label{font-size:11px;font-weight:600;color:var(--t2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;}
-.modal-input{width:100%;background:var(--s2);border:1px solid var(--b2);border-radius:7px;padding:8px 11px;font-size:12px;color:var(--tx);font-family:var(--fn);outline:none;}
+.modal-sub{font-size:12px;color:var(--t3);margin-bottom:16px;}
+.modal-section{margin-bottom:14px;}
+.modal-label{font-size:11px;font-weight:600;color:var(--t2);margin-bottom:7px;text-transform:uppercase;letter-spacing:.06em;}
+.modal-input{width:100%;background:var(--s2);border:1px solid var(--b2);border-radius:7px;padding:10px 11px;font-size:12px;color:var(--tx);font-family:var(--fn);outline:none;min-height:40px;-webkit-appearance:none;}
 .modal-input:focus{border-color:var(--ac);}
-.modal-btns{display:flex;gap:8px;margin-top:20px;}
-.modal-btn{flex:1;padding:10px;border-radius:8px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:12px;font-family:var(--fn);cursor:pointer;transition:all .15s;}
-.modal-btn:hover{border-color:var(--ac);color:var(--ac);}
+.modal-btns{display:flex;gap:8px;margin-top:18px;}
+.modal-btn{flex:1;padding:11px;border-radius:8px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:12px;font-family:var(--fn);cursor:pointer;transition:all .15s;min-height:44px;}
+.modal-btn:hover,.modal-btn:active{border-color:var(--ac);color:var(--ac);}
 .modal-btn.primary{background:var(--gn);border-color:var(--gn);color:#000;font-weight:700;}
-.modal-btn.primary:hover{opacity:.9;}
-.preview-box{background:white;border-radius:8px;padding:16px;color:#000;font-family:Arial,sans-serif;font-size:11px;line-height:1.5;max-height:300px;overflow-y:auto;}
+.modal-btn.primary:hover,.modal-btn.primary:active{opacity:.9;}
 
 /* TOAST */
-.toast{position:fixed;top:62px;right:16px;z-index:3000;background:var(--s2);border:1px solid var(--b2);border-radius:8px;padding:9px 14px;font-size:12px;color:var(--tx);opacity:0;transition:opacity .3s;pointer-events:none;max-width:300px;box-shadow:0 8px 24px rgba(0,0,0,.5);}
+.toast{position:fixed;top:62px;right:12px;z-index:3000;background:var(--s2);border:1px solid var(--b2);border-radius:8px;padding:9px 14px;font-size:12px;color:var(--tx);opacity:0;transition:opacity .3s;pointer-events:none;max-width:280px;box-shadow:0 8px 24px rgba(0,0,0,.5);}
 .toast.show{opacity:1;}
 .empt{padding:26px 16px;text-align:center;color:var(--t3);}
 .empt .ei{font-size:28px;margin-bottom:8px;}
 .empt p{font-size:12px;line-height:1.7;}
+
+/* ════════════════════════════════════════════
+   MOBILE BOTTOM SHEET (map-level detail on mobile)
+════════════════════════════════════════════ */
+.sheet-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:800;touch-action:none;}
+.sheet-overlay.show{display:block;}
+.bottom-sheet{
+  position:fixed;bottom:0;left:0;right:0;z-index:900;
+  background:var(--sf);border-top:1px solid var(--b2);
+  border-radius:18px 18px 0 0;
+  max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+}
+.bottom-sheet.show{transform:translateY(0);}
+.sheet-handle{width:36px;height:4px;background:var(--b3);border-radius:2px;margin:12px auto 6px;}
+
+/* SIDEBAR OVERLAY (mobile: sidebar slides in over map) */
+.sb-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:190;
+}
+.sb-overlay.show{display:block;}
+
+/* ════════════════════════════════════════════
+   LEAFLET DARK
+════════════════════════════════════════════ */
 .leaflet-popup-content-wrapper{background:var(--s2)!important;border:1px solid var(--b2)!important;border-radius:10px!important;box-shadow:0 8px 24px rgba(0,0,0,.6)!important;}
 .leaflet-popup-tip{background:var(--s2)!important;}
 .leaflet-popup-content{color:var(--tx)!important;font-family:var(--fn)!important;font-size:12px!important;margin:10px 12px!important;}
+
+/* ════════════════════════════════════════════
+   RESPONSIVE BREAKPOINTS
+════════════════════════════════════════════ */
+
+/* ── TABLET (768px – 1023px) ── */
+@media (max-width:1023px){
+  :root{--sb-w:300px;}
+  .bsub{display:none;}
+  #rsum{gap:9px;padding:8px 12px;}
+  .pill{font-size:10px;padding:3px 8px;}
+}
+
+/* ── MOBILE (≤767px) ── */
+@media (max-width:767px){
+  :root{--nav-h:50px;--sb-w:calc(100vw - 32px);}
+
+  /* show hamburger */
+  .ham-btn{display:flex;}
+
+  /* Pills — hide non-essential on mobile */
+  .pill.am{display:none;}
+
+  /* Sidebar: off-canvas left drawer */
+  .sb{
+    position:fixed;left:0;top:var(--nav-h);bottom:0;
+    width:var(--sb-w);max-width:340px;
+    transform:translateX(-105%);
+    box-shadow:none;
+    z-index:200;
+  }
+  .sb.open{
+    transform:translateX(0);
+    box-shadow:8px 0 32px rgba(0,0,0,.6);
+  }
+
+  /* Main takes full width */
+  .main{width:100%;}
+
+  /* Map toolbar: compress */
+  .mtb{padding:0 .6rem;height:42px;}
+  .mbtn{padding:5px 8px;font-size:11px;}
+  .mbtn span.label{display:none;}/* hide text labels, keep icons */
+
+  /* Detail panel: hidden on mobile, shown as bottom sheet */
+  #dp{display:none!important;}
+
+  /* Legend: smaller */
+  #legend{bottom:auto;top:12px;right:12px;padding:8px 10px;min-width:140px;}
+  .leg-i{font-size:10px;}
+
+  /* Route summary: above bottom fold */
+  #rsum{
+    bottom:16px;
+    left:8px;right:8px;
+    transform:none;
+    gap:8px;padding:8px 12px;
+    flex-wrap:wrap;justify-content:center;
+  }
+  .rv{font-size:12px;}
+  .rsep{height:18px;}
+
+  /* Result panel: limit on mobile */
+  .rpanel{max-height:32vh;}
+
+  /* Up zone: more compact */
+  .up-sub{display:none;}
+}
+
+/* ── VERY SMALL (≤380px) ── */
+@media (max-width:380px){
+  .pill.hi{display:none;}
+  .act-btn{font-size:10px;padding:6px 4px;}
+  .mbtn{padding:5px 7px;}
+  #rsum{gap:6px;padding:7px 10px;}
+  .rv{font-size:11px;}
+  .rsep{height:16px;}
+}
+
+/* ── LARGE (≥1280px) ── */
+@media (min-width:1280px){
+  :root{--sb-w:380px;}
+  .bsub{display:inline;}
+  .pill{font-size:11px;}
+}
+
+/* ── LANDSCAPE MOBILE ── */
+@media (max-width:767px) and (orientation:landscape){
+  :root{--nav-h:44px;}
+  .sb{top:var(--nav-h);}
+  .rpanel{max-height:28vh;}
+  #legend{top:8px;right:8px;}
+  #rsum{bottom:8px;}
+}
 </style>
 </head>
 <body>
 
+<!-- ═══════ NAV ═══════ -->
 <nav>
   <div class="brand">
     <div class="blogo">🛣️</div>
-    <div><div class="bname">Route<em>Plan</em> <span class="bsub">Sequence Surface LLP</span></div></div>
+    <div>
+      <div class="bname">Route<em>Plan</em> <span class="bsub">Sequence Surface LLP</span></div>
+    </div>
   </div>
   <div class="nav-r">
     <div class="pill"><span class="ldot"></span><span id="navTotal">— dealers</span></div>
     <div class="pill am" id="navMand" style="display:none">0 planned</div>
     <div class="pill hi" id="navSel">0 selected</div>
     <div class="pill gn" id="navDays" style="display:none">0 days</div>
+    <!-- Hamburger (mobile only) -->
+    <div class="ham-btn" id="hamBtn" onclick="toggleSidebar()" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </div>
   </div>
 </nav>
 
-<div class="shell">
-<div class="sb">
+<!-- ═══════ SIDEBAR OVERLAY ═══════ -->
+<div class="sb-overlay" id="sbOverlay" onclick="closeSidebar()"></div>
 
-  <!-- UPLOAD / DOWNLOAD ZONE -->
+<!-- ═══════ SHELL ═══════ -->
+<div class="shell">
+
+<!-- ═══════ SIDEBAR ═══════ -->
+<div class="sb" id="sidebar">
+
+  <!-- UPLOAD ZONE -->
   <div class="upzone">
     <div class="up-inner" id="upInner">
       <input type="file" id="fileIn" accept=".csv,.xlsx,.xls" onchange="handleFile(this.files[0])">
       <div class="up-icon">📂</div>
       <div class="up-title">Upload Your Party List</div>
-      <div class="up-sub">Download the template → delete parties you don't need → upload back to plan route</div>
+      <div class="up-sub">Download template → delete parties you don't need → upload to plan</div>
       <div class="up-step">Supports .xlsx · .xls · .csv</div>
     </div>
     <div class="action-row">
-      <button class="act-btn green" onclick="downloadTemplate()">⬇ Download Template</button>
-      <button class="act-btn" onclick="document.getElementById('fileIn').click()">⬆ Upload List</button>
+      <button class="act-btn green" onclick="downloadTemplate()">⬇ Template</button>
+      <button class="act-btn" onclick="document.getElementById('fileIn').click()">⬆ Upload</button>
     </div>
     <div class="prog-wrap" id="progWrap">
       <div class="prog-bar"><div class="prog-fill" id="pFill" style="width:0%"></div></div>
@@ -323,9 +496,9 @@ nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:f
       <div class="us-r"><span class="us-k">Parties in file</span><span class="us-v" id="sumTotal">—</span></div>
       <div class="us-r"><span class="us-k">Matched in database</span><span class="us-v" style="color:var(--gn)" id="sumMatch">—</span></div>
       <div class="us-r"><span class="us-k">Nearby suggestions</span><span class="us-v" style="color:var(--ac)" id="sumSugg">—</span></div>
-      <div class="us-r" id="unmRow" style="display:none"><span class="us-k" style="color:var(--rd)">Not found</span><span class="us-v" style="color:var(--rd);font-size:10px;text-align:right;max-width:180px" id="sumUnm">—</span></div>
+      <div class="us-r" id="unmRow" style="display:none"><span class="us-k" style="color:var(--rd)">Not found</span><span class="us-v" style="color:var(--rd);font-size:10px;text-align:right;max-width:160px" id="sumUnm">—</span></div>
       <div class="us-btns">
-        <button class="usb ok" onclick="applyUpload()">✓ Plan These Parties</button>
+        <button class="usb ok" onclick="applyUpload()">✓ Plan These</button>
         <button class="usb" onclick="resetUpload()">✕ Clear</button>
       </div>
     </div>
@@ -333,7 +506,7 @@ nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:f
 
   <!-- CITY TABS -->
   <div class="ctabs-wrap">
-    <div class="cth-row"><span class="ctl">City View</span><span class="cth">✓ Picks persist across tabs</span></div>
+    <div class="cth-row"><span class="ctl">City View</span><span class="cth">✓ Picks persist</span></div>
     <div class="ctabs" id="cityTabs"></div>
   </div>
 
@@ -363,10 +536,10 @@ nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:f
 
   <!-- SEARCH -->
   <div class="swrap">
-    <input class="sinput" id="searchBox" placeholder="Search by dealer, city, zone…" oninput="renderList()">
+    <input class="sinput" id="searchBox" placeholder="Search dealer, city, zone…" oninput="renderList()">
   </div>
 
-  <!-- RESULT PANEL -->
+  <!-- DAY RESULT PANEL -->
   <div class="rpanel" id="rpanel">
     <div class="rphdr">
       <div class="rptitle">📅 Day-wise Route Plan</div>
@@ -381,35 +554,35 @@ nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:f
   <!-- FOOTER -->
   <div class="footer">
     <div class="fsel">
-      <span id="fselText">Download template, fill it, then upload</span>
+      <span id="fselText">Download template, fill, then upload</span>
       <span class="fsub" id="fselCities"></span>
     </div>
-    <button class="planbtn" id="planBtn" onclick="planRoute()" disabled>📅 Plan Day-wise Route</button>
+    <button class="planbtn" id="planBtn" onclick="planRoute();closeSidebar();" disabled>📅 Plan Day-wise Route</button>
     <div class="f2">
-      <button class="fbtn" onclick="selPlanned()">📋 Planned only</button>
-      <button class="fbtn" onclick="selAllVisible()">☑ All visible</button>
+      <button class="fbtn" onclick="selPlanned()">📋 Planned</button>
+      <button class="fbtn" onclick="selAllVisible()">☑ All</button>
       <button class="fbtn danger" onclick="clearAll()">✕ Clear</button>
     </div>
   </div>
-</div>
+</div><!-- /sidebar -->
 
-<!-- MAP AREA -->
+<!-- ═══════ MAP ═══════ -->
 <div class="main">
   <div class="mtb">
     <div class="tbl">
-      <button class="mbtn primary" onclick="planRoute()">📅 Plan Route</button>
-      <button class="mbtn export" id="exportBtn" onclick="openExportModal()" style="display:none">📄 Export PDF</button>
-      <button class="mbtn" onclick="clearAll()">✕ Clear</button>
+      <button class="mbtn primary" onclick="planRoute();closeSidebar();">📅 <span class="label">Plan</span></button>
+      <button class="mbtn export" id="exportBtn" onclick="openExportModal()" style="display:none">📄 <span class="label">PDF</span></button>
+      <button class="mbtn" onclick="clearAll()">✕</button>
     </div>
     <div class="tbr">
-      <button class="mbtn" onclick="toggleLeg()">🗺 Legend</button>
-      <button class="mbtn" onclick="fitView()">⊞ Fit</button>
+      <button class="mbtn" onclick="toggleLeg()">🗺</button>
+      <button class="mbtn" onclick="fitView()">⊞</button>
     </div>
   </div>
   <div class="mapwrap">
     <div id="map"></div>
 
-    <!-- DETAIL PANEL -->
+    <!-- DESKTOP: Detail Panel (overlay on map) -->
     <div class="ovl" id="dp">
       <div class="dpi">
         <button class="dpclose" onclick="closeDP()">×</button>
@@ -438,15 +611,14 @@ nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:f
     <!-- LEGEND -->
     <div class="ovl" id="legend">
       <div class="leg-t">Legend</div>
-      <div class="leg-i"><div class="leg-d" style="background:var(--mand);box-shadow:0 0 0 3px rgba(245,166,35,.35)"></div>From your plan list</div>
+      <div class="leg-i"><div class="leg-d" style="background:var(--mand);box-shadow:0 0 0 3px rgba(245,166,35,.35)"></div>From your list</div>
       <div class="leg-i"><div class="leg-d" style="background:var(--gn);box-shadow:0 0 0 3px rgba(15,212,122,.3)"></div>Nearby suggestion</div>
       <div class="leg-i"><div class="leg-d" style="background:#f5a623"></div>Key Account</div>
       <div class="leg-i"><div class="leg-d" style="background:#0fd47a"></div>Achiever</div>
       <div class="leg-i"><div class="leg-d" style="background:#4f7fff"></div>Active</div>
       <div class="leg-i"><div class="leg-d" style="background:#f04f5b;opacity:.5"></div>Inactive</div>
       <div class="leg-s"></div>
-      <div class="leg-i" style="font-size:10px">⚪ White ring = selected</div>
-      <div class="leg-i" style="font-size:10px">🔢 Number = route stop</div>
+      <div class="leg-i" style="font-size:10px">⚪ Selected · 🔢 Stop#</div>
     </div>
 
     <!-- ROUTE SUMMARY -->
@@ -455,19 +627,26 @@ nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:f
       <div class="rsep"></div>
       <div class="ri"><div class="rv" id="rsStops">—</div><div class="rl">Stops</div></div>
       <div class="rsep"></div>
-      <div class="ri"><div class="rv" id="rsDist">—</div><div class="rl">Distance</div></div>
+      <div class="ri"><div class="rv" id="rsDist">—</div><div class="rl">Dist</div></div>
       <div class="rsep"></div>
       <div class="ri"><div class="rv" id="rsCities">—</div><div class="rl">Cities</div></div>
     </div>
   </div>
-</div>
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- MOBILE: Bottom Sheet for dealer detail -->
+<div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet()"></div>
+<div class="bottom-sheet" id="bottomSheet">
+  <div class="sheet-handle"></div>
+  <div class="dpi" id="sheetContent"></div>
 </div>
 
 <!-- PDF EXPORT MODAL -->
 <div class="modal-bg" id="exportModal">
   <div class="modal">
     <div class="modal-title">📄 Export Route Plan</div>
-    <div class="modal-sub">Generates a printable PDF with your complete day-wise visit schedule</div>
+    <div class="modal-sub">Printable PDF with day-wise visit schedule</div>
     <div class="modal-section">
       <div class="modal-label">Salesman Name</div>
       <input class="modal-input" id="exportName" value="Joseph" placeholder="Salesman name">
@@ -478,7 +657,7 @@ nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:f
     </div>
     <div class="modal-section">
       <div class="modal-label">Notes (optional)</div>
-      <input class="modal-input" id="exportNotes" placeholder="e.g. Q2 Coverage Tour — Tamil Nadu">
+      <input class="modal-input" id="exportNotes" placeholder="e.g. Q2 Coverage Tour">
     </div>
     <div class="modal-btns">
       <button class="modal-btn" onclick="closeExportModal()">Cancel</button>
@@ -490,69 +669,71 @@ nav{height:52px;background:var(--sf);border-bottom:1px solid var(--b2);display:f
 <div class="toast" id="toast"></div>
 
 <script>
-/* ══════════════════════════════════════════════════════
-   FULL DEALER DATABASE — Joseph Tamil Nadu Territory
-   (Original 13 + 17 additional dummy dealers)
-══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════
+   DATA
+══════════════════════════════════════════ */
 const STATUS_COLOR={'Key Account':'#f5a623','Achiever':'#0fd47a','Active':'#4f7fff','Inactive':'#f04f5b'};
 const STATUS_CL={'Key Account':'sp-ka','Achiever':'sp-ach','Active':'sp-act','Inactive':'sp-ina'};
-const CITY_COLORS={COIMBATORE:'#4f7fff',TIRUPUR:'#0fd47a',KARUR:'#f5a623',MADURAI:'#a78bfa',DINDIGUL:'#fb923c',TIRUNELVELI:'#f472b6',ERODE:'#34d399',SALEM:'#60a5fa',TRICHY:'#fbbf24'};
+const CITY_COLORS={COIMBATORE:'#4f7fff',TIRUPUR:'#0fd47a',KARUR:'#f5a623',MADURAI:'#a78bfa',DINDIGUL:'#fb923c',TIRUNELVELI:'#f472b6',ERODE:'#34d399',SALEM:'#60a5fa'};
 const DAY_COLORS=['#4f7fff','#0fd47a','#f5a623','#a78bfa','#fb923c','#f472b6','#34d399','#60a5fa','#fbbf24'];
 const NEARBY_KM=25, MAX_DAY=6, TRAVEL_KM=80;
 
 const MASTER=[
-  // ── ORIGINAL 13 ──
-  {id:0,  name:'AQUA TERRA',                             salesman:'Joseph',city:'TIRUPUR',    state:'Tamil Nadu',zone:'zone 1',status:'Key Account',lat:11.1085,lng:77.3411,lastVisit:12},
-  {id:1,  name:'MAHAVIR SQUARE',                         salesman:'Joseph',city:'COIMBATORE', state:'Tamil Nadu',zone:'zone 1',status:'Achiever',   lat:11.0168,lng:76.9558,lastVisit:18},
-  {id:2,  name:'VELAN TRADERS - LOCK HINGES',            salesman:'Joseph',city:'KARUR',      state:'Tamil Nadu',zone:'zone 1',status:'Achiever',   lat:10.9601,lng:78.0766,lastVisit:25},
-  {id:3,  name:'NELLAI PLYWOOD',                         salesman:'Joseph',city:'TIRUNELVELI',state:'Tamil Nadu',zone:'zone 1',status:'Achiever',   lat:8.7139, lng:77.7567,lastVisit:30},
-  {id:4,  name:'AMBIKAA BUILDING MATERIALS PRIVATE LIMITED',salesman:'Joseph',city:'DINDIGUL',state:'Tamil Nadu',zone:'zone 1',status:'Achiever',   lat:10.3624,lng:77.9695,lastVisit:22},
-  {id:5,  name:'SHRII RATHINA CO.',                      salesman:'Joseph',city:'MADURAI',    state:'Tamil Nadu',zone:'zone 1',status:'Key Account',lat:9.9252, lng:78.1198,lastVisit:10},
-  {id:6,  name:'NEXT WOODS',                             salesman:'Joseph',city:'COIMBATORE', state:'Tamil Nadu',zone:'zone 2',status:'Achiever',   lat:11.0300,lng:76.9800,lastVisit:15},
-  {id:7,  name:'PADMAVATHI DECOR',                       salesman:'Joseph',city:'COIMBATORE', state:'Tamil Nadu',zone:'zone 3',status:'Achiever',   lat:11.0050,lng:76.9700,lastVisit:20},
-  {id:8,  name:'SRI BALAJI PLYWOOD & HARDWARE (KARUR)',  salesman:'Joseph',city:'KARUR',      state:'Tamil Nadu',zone:'zone 4',status:'Achiever',   lat:10.9700,lng:78.0900,lastVisit:28},
-  {id:9,  name:'SOUTH INDIA INTERIOR SOLUTIONS',         salesman:'Joseph',city:'COIMBATORE', state:'Tamil Nadu',zone:'zone 5',status:'Achiever',   lat:11.0450,lng:77.0100,lastVisit:14},
-  {id:10, name:'SARASWATYI GLASSES AND PLY PRIVATE LIMITED',salesman:'Joseph',city:'MADURAI', state:'Tamil Nadu',zone:'zone 5',status:'Achiever',   lat:9.9100, lng:78.1300,lastVisit:35},
-  {id:11, name:'A.K.PLYWOOD',                            salesman:'Joseph',city:'TIRUPUR',    state:'Tamil Nadu',zone:'—',    status:'Achiever',   lat:11.1200,lng:77.3550,lastVisit:40},
-  {id:12, name:'PARASNATH IMPEX',                        salesman:'Joseph',city:'COIMBATORE', state:'Tamil Nadu',zone:'zone 3',status:'Inactive',   lat:11.0600,lng:76.9400,lastVisit:90},
-  // ── COIMBATORE ADDITIONS ──
-  {id:13, name:'CLASSIC WOOD WORKS',                     salesman:'Joseph',city:'COIMBATORE', state:'Tamil Nadu',zone:'zone 2',status:'Active',     lat:11.0220,lng:77.0050,lastVisit:16},
-  {id:14, name:'ROYAL LAMINATES & PLY',                  salesman:'Joseph',city:'COIMBATORE', state:'Tamil Nadu',zone:'zone 1',status:'Key Account',lat:11.0090,lng:76.9650,lastVisit:8},
-  {id:15, name:'METRO HARDWARE HOUSE',                   salesman:'Joseph',city:'COIMBATORE', state:'Tamil Nadu',zone:'zone 4',status:'Achiever',   lat:11.0380,lng:76.9900,lastVisit:21},
-  {id:16, name:'DECOR POINT CBE',                        salesman:'Joseph',city:'COIMBATORE', state:'Tamil Nadu',zone:'zone 2',status:'Active',     lat:11.0500,lng:76.9750,lastVisit:33},
-  // ── TIRUPUR ADDITIONS ──
-  {id:17, name:'PIONEER PLY CENTRE',                     salesman:'Joseph',city:'TIRUPUR',    state:'Tamil Nadu',zone:'zone 2',status:'Achiever',   lat:11.1000,lng:77.3600,lastVisit:19},
-  {id:18, name:'GANESH TIMBERS TIRUPUR',                 salesman:'Joseph',city:'TIRUPUR',    state:'Tamil Nadu',zone:'zone 1',status:'Active',     lat:11.1150,lng:77.3300,lastVisit:44},
-  {id:19, name:'TEXTILES HARDWARE & PLY',                salesman:'Joseph',city:'TIRUPUR',    state:'Tamil Nadu',zone:'zone 3',status:'Achiever',   lat:11.0950,lng:77.3480,lastVisit:11},
-  // ── MADURAI ADDITIONS ──
-  {id:20, name:'PANDIAN WOOD DEPOT',                     salesman:'Joseph',city:'MADURAI',    state:'Tamil Nadu',zone:'zone 2',status:'Achiever',   lat:9.9350, lng:78.1050,lastVisit:17},
-  {id:21, name:'MEENAKSHI PLYWOOD CENTRE',               salesman:'Joseph',city:'MADURAI',    state:'Tamil Nadu',zone:'zone 3',status:'Key Account',lat:9.9180, lng:78.1250,lastVisit:6},
-  {id:22, name:'SOUTH DECOR MADURAI',                    salesman:'Joseph',city:'MADURAI',    state:'Tamil Nadu',zone:'zone 4',status:'Active',     lat:9.9050, lng:78.1400,lastVisit:29},
-  // ── KARUR ADDITIONS ──
-  {id:23, name:'KAVERI TIMBER MART',                     salesman:'Joseph',city:'KARUR',      state:'Tamil Nadu',zone:'zone 2',status:'Active',     lat:10.9750,lng:78.0700,lastVisit:36},
-  {id:24, name:'BHARATHI PLY & HARDWARE',                salesman:'Joseph',city:'KARUR',      state:'Tamil Nadu',zone:'zone 3',status:'Achiever',   lat:10.9500,lng:78.0800,lastVisit:13},
-  // ── ERODE (new city) ──
-  {id:25, name:'ERODE TIMBER HOUSE',                     salesman:'Joseph',city:'ERODE',      state:'Tamil Nadu',zone:'zone 1',status:'Key Account',lat:11.3410,lng:77.7280,lastVisit:20},
-  {id:26, name:'KONGU INTERIOR SOLUTIONS',               salesman:'Joseph',city:'ERODE',      state:'Tamil Nadu',zone:'zone 2',status:'Achiever',   lat:11.3550,lng:77.7150,lastVisit:32},
-  {id:27, name:'SAKTHI PLY DEPOT ERODE',                 salesman:'Joseph',city:'ERODE',      state:'Tamil Nadu',zone:'zone 1',status:'Active',     lat:11.3300,lng:77.7350,lastVisit:45},
-  // ── SALEM (new city) ──
-  {id:28, name:'STERLING HARDWARE SALEM',                salesman:'Joseph',city:'SALEM',      state:'Tamil Nadu',zone:'zone 1',status:'Key Account',lat:11.6643,lng:78.1460,lastVisit:15},
-  {id:29, name:'VANI PLYWOOD SALEM',                     salesman:'Joseph',city:'SALEM',      state:'Tamil Nadu',zone:'zone 2',status:'Achiever',   lat:11.6780,lng:78.1320,lastVisit:27},
+  {id:0, name:'AQUA TERRA',lat:11.1085,lng:77.3411,city:'TIRUPUR',state:'Tamil Nadu',zone:'zone 1',status:'Key Account',salesman:'Joseph',lastVisit:12},
+  {id:1, name:'MAHAVIR SQUARE',lat:11.0168,lng:76.9558,city:'COIMBATORE',state:'Tamil Nadu',zone:'zone 1',status:'Achiever',salesman:'Joseph',lastVisit:18},
+  {id:2, name:'VELAN TRADERS - LOCK HINGES',lat:10.9601,lng:78.0766,city:'KARUR',state:'Tamil Nadu',zone:'zone 1',status:'Achiever',salesman:'Joseph',lastVisit:25},
+  {id:3, name:'NELLAI PLYWOOD',lat:8.7139,lng:77.7567,city:'TIRUNELVELI',state:'Tamil Nadu',zone:'zone 1',status:'Achiever',salesman:'Joseph',lastVisit:30},
+  {id:4, name:'AMBIKAA BUILDING MATERIALS PRIVATE LIMITED',lat:10.3624,lng:77.9695,city:'DINDIGUL',state:'Tamil Nadu',zone:'zone 1',status:'Achiever',salesman:'Joseph',lastVisit:22},
+  {id:5, name:'SHRII RATHINA CO.',lat:9.9252,lng:78.1198,city:'MADURAI',state:'Tamil Nadu',zone:'zone 1',status:'Key Account',salesman:'Joseph',lastVisit:10},
+  {id:6, name:'NEXT WOODS',lat:11.0300,lng:76.9800,city:'COIMBATORE',state:'Tamil Nadu',zone:'zone 2',status:'Achiever',salesman:'Joseph',lastVisit:15},
+  {id:7, name:'PADMAVATHI DECOR',lat:11.0050,lng:76.9700,city:'COIMBATORE',state:'Tamil Nadu',zone:'zone 3',status:'Achiever',salesman:'Joseph',lastVisit:20},
+  {id:8, name:'SRI BALAJI PLYWOOD & HARDWARE (KARUR)',lat:10.9700,lng:78.0900,city:'KARUR',state:'Tamil Nadu',zone:'zone 4',status:'Achiever',salesman:'Joseph',lastVisit:28},
+  {id:9, name:'SOUTH INDIA INTERIOR SOLUTIONS',lat:11.0450,lng:77.0100,city:'COIMBATORE',state:'Tamil Nadu',zone:'zone 5',status:'Achiever',salesman:'Joseph',lastVisit:14},
+  {id:10,name:'SARASWATYI GLASSES AND PLY PRIVATE LIMITED',lat:9.9100,lng:78.1300,city:'MADURAI',state:'Tamil Nadu',zone:'zone 5',status:'Achiever',salesman:'Joseph',lastVisit:35},
+  {id:11,name:'A.K.PLYWOOD',lat:11.1200,lng:77.3550,city:'TIRUPUR',state:'Tamil Nadu',zone:'—',status:'Achiever',salesman:'Joseph',lastVisit:40},
+  {id:12,name:'PARASNATH IMPEX',lat:11.0600,lng:76.9400,city:'COIMBATORE',state:'Tamil Nadu',zone:'zone 3',status:'Inactive',salesman:'Joseph',lastVisit:90},
+  {id:13,name:'CLASSIC WOOD WORKS',lat:11.0220,lng:77.0050,city:'COIMBATORE',state:'Tamil Nadu',zone:'zone 2',status:'Active',salesman:'Joseph',lastVisit:16},
+  {id:14,name:'ROYAL LAMINATES & PLY',lat:11.0090,lng:76.9650,city:'COIMBATORE',state:'Tamil Nadu',zone:'zone 1',status:'Key Account',salesman:'Joseph',lastVisit:8},
+  {id:15,name:'METRO HARDWARE HOUSE',lat:11.0380,lng:76.9900,city:'COIMBATORE',state:'Tamil Nadu',zone:'zone 4',status:'Achiever',salesman:'Joseph',lastVisit:21},
+  {id:16,name:'DECOR POINT CBE',lat:11.0500,lng:76.9750,city:'COIMBATORE',state:'Tamil Nadu',zone:'zone 2',status:'Active',salesman:'Joseph',lastVisit:33},
+  {id:17,name:'PIONEER PLY CENTRE',lat:11.1000,lng:77.3600,city:'TIRUPUR',state:'Tamil Nadu',zone:'zone 2',status:'Achiever',salesman:'Joseph',lastVisit:19},
+  {id:18,name:'GANESH TIMBERS TIRUPUR',lat:11.1150,lng:77.3300,city:'TIRUPUR',state:'Tamil Nadu',zone:'zone 1',status:'Active',salesman:'Joseph',lastVisit:44},
+  {id:19,name:'TEXTILES HARDWARE & PLY',lat:11.0950,lng:77.3480,city:'TIRUPUR',state:'Tamil Nadu',zone:'zone 3',status:'Achiever',salesman:'Joseph',lastVisit:11},
+  {id:20,name:'PANDIAN WOOD DEPOT',lat:9.9350,lng:78.1050,city:'MADURAI',state:'Tamil Nadu',zone:'zone 2',status:'Achiever',salesman:'Joseph',lastVisit:17},
+  {id:21,name:'MEENAKSHI PLYWOOD CENTRE',lat:9.9180,lng:78.1250,city:'MADURAI',state:'Tamil Nadu',zone:'zone 3',status:'Key Account',salesman:'Joseph',lastVisit:6},
+  {id:22,name:'SOUTH DECOR MADURAI',lat:9.9050,lng:78.1400,city:'MADURAI',state:'Tamil Nadu',zone:'zone 4',status:'Active',salesman:'Joseph',lastVisit:29},
+  {id:23,name:'KAVERI TIMBER MART',lat:10.9750,lng:78.0700,city:'KARUR',state:'Tamil Nadu',zone:'zone 2',status:'Active',salesman:'Joseph',lastVisit:36},
+  {id:24,name:'BHARATHI PLY & HARDWARE',lat:10.9500,lng:78.0800,city:'KARUR',state:'Tamil Nadu',zone:'zone 3',status:'Achiever',salesman:'Joseph',lastVisit:13},
+  {id:25,name:'ERODE TIMBER HOUSE',lat:11.3410,lng:77.7280,city:'ERODE',state:'Tamil Nadu',zone:'zone 1',status:'Key Account',salesman:'Joseph',lastVisit:20},
+  {id:26,name:'KONGU INTERIOR SOLUTIONS',lat:11.3550,lng:77.7150,city:'ERODE',state:'Tamil Nadu',zone:'zone 2',status:'Achiever',salesman:'Joseph',lastVisit:32},
+  {id:27,name:'SAKTHI PLY DEPOT ERODE',lat:11.3300,lng:77.7350,city:'ERODE',state:'Tamil Nadu',zone:'zone 1',status:'Active',salesman:'Joseph',lastVisit:45},
+  {id:28,name:'STERLING HARDWARE SALEM',lat:11.6643,lng:78.1460,city:'SALEM',state:'Tamil Nadu',zone:'zone 1',status:'Key Account',salesman:'Joseph',lastVisit:15},
+  {id:29,name:'VANI PLYWOOD SALEM',lat:11.6780,lng:78.1320,city:'SALEM',state:'Tamil Nadu',zone:'zone 2',status:'Achiever',salesman:'Joseph',lastVisit:27},
 ];
-
-// Add computed fields
-MASTER.forEach(d=>{
-  d.planKind='normal'; // 'planned'|'suggested'|'normal'
-  d.nearbyDist=null;
-  d.score=+(Math.min(3,d.lastVisit/30)*({A:3,B:2}[d.cls]||1.5)*(STATUS_COLOR[d.status]==='#f5a623'?2:1)).toFixed(1);
-});
+MASTER.forEach(d=>{d.planKind='normal';d.nearbyDist=null;d.score=+(Math.min(3,d.lastVisit/30)*1.5*(STATUS_COLOR[d.status]==='#f5a623'?2:1)).toFixed(1);});
 
 /* ══ STATE ══ */
-let cityF='ALL', statusF='ALL', planF='ALL';
+let cityF='ALL',statusF='ALL',planF='ALL';
 let picked=new Set();
-let dayPlan=[], flatRoute=[];
-let mkrs=[], polys=[], arrMkrs=[];
-let curDP=-1, pendingUpload=null;
+let dayPlan=[],flatRoute=[];
+let mkrs=[],polys=[],arrMkrs=[];
+let curDP=-1,pendingUpload=null;
+
+/* ══ RESPONSIVE HELPER ══ */
+function isMobile(){return window.innerWidth<=767;}
+
+/* ══ SIDEBAR TOGGLE (mobile) ══ */
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.getElementById('sbOverlay');
+  const open=sb.classList.toggle('open');
+  ov.classList.toggle('show',open);
+}
+function closeSidebar(){
+  if(!isMobile()) return;
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sbOverlay').classList.remove('show');
+}
 
 /* ══ MAP ══ */
 const map=L.map('map',{zoomControl:false}).setView([10.5,78.0],7);
@@ -572,37 +753,24 @@ function havXY(la1,lo1,la2,lo2){
   return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));
 }
 
-/* ══ DOWNLOAD TEMPLATE ══ */
+/* ══ TEMPLATE DOWNLOAD ══ */
 function downloadTemplate(){
-  // Build workbook with ALL dealers — user deletes rows they don't need, re-uploads
-  const rows=[
-    ['Dealers Name','Sales Man','City','State','Dealer Zone','User Status'],
-    ...MASTER.filter(d=>d.status!=='Inactive').map(d=>[
-      d.name, d.salesman, d.city, d.state, d.zone||'', d.status
-    ])
-  ];
-  const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  // Column widths
+  const rows=[['Dealers Name','Sales Man','City','State','Dealer Zone','User Status'],...MASTER.filter(d=>d.status!=='Inactive').map(d=>[d.name,d.salesman,d.city,d.state,d.zone||'',d.status])];
+  const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!cols']=[{wch:45},{wch:12},{wch:14},{wch:12},{wch:10},{wch:14}];
-  // Header styling via cell formats
-  const headerStyle={font:{bold:true},fill:{fgColor:{rgb:'1A2030'}},alignment:{horizontal:'center'}};
-  ['A1','B1','C1','D1','E1','F1'].forEach(cell=>{
-    if(ws[cell]) ws[cell].s=headerStyle;
-  });
   XLSX.utils.book_append_sheet(wb,ws,'JOSEPH');
   XLSX.writeFile(wb,'Joseph_Party_List.xlsx');
-  toast('📥 Template downloaded! Delete parties you don\'t need, then upload back.');
+  toast('📥 Template downloaded!');
 }
 
 /* ══ FILE UPLOAD ══ */
 function handleFile(file){
   if(!file) return;
   const ext=file.name.split('.').pop().toLowerCase();
-  showProg(20,'Reading file…');
+  showProg(20,'Reading…');
   const reader=new FileReader();
   reader.onload=e=>{
-    showProg(55,'Matching parties…');
+    showProg(55,'Matching…');
     try{
       let rows=[];
       if(ext==='csv') rows=Papa.parse(e.target.result,{header:true,skipEmptyLines:true}).data;
@@ -614,42 +782,25 @@ function handleFile(file){
 }
 
 function parseUpload(rows){
-  // Flexible column detection
   const keys=Object.keys(rows[0]||{});
   const nameK=keys.find(k=>/dealer|name|party|account/i.test(k))||keys[0];
-
-  const uploadedNames=rows.map(r=>String(r[nameK]||'').trim()).filter(Boolean);
-  const matched=[], unmatched=[];
-
-  uploadedNames.forEach(raw=>{
-    let found=MASTER.find(d=>d.name.toLowerCase()===raw.toLowerCase());
-    if(!found) found=MASTER.find(d=>d.name.toLowerCase().includes(raw.toLowerCase())||raw.toLowerCase().includes(d.name.toLowerCase().split(' ')[0]));
-    if(!found){
-      const ws=raw.toLowerCase().split(/\s+/);
-      found=MASTER.find(d=>ws.some(w=>w.length>3&&d.name.toLowerCase().includes(w)));
-    }
-    found?matched.push(found):unmatched.push(raw);
+  const names=rows.map(r=>String(r[nameK]||'').trim()).filter(Boolean);
+  const matched=[],unmatched=[];
+  names.forEach(raw=>{
+    let f=MASTER.find(d=>d.name.toLowerCase()===raw.toLowerCase());
+    if(!f) f=MASTER.find(d=>d.name.toLowerCase().includes(raw.toLowerCase())||raw.toLowerCase().includes(d.name.toLowerCase().split(' ')[0]));
+    if(!f){const ws=raw.toLowerCase().split(/\s+/);f=MASTER.find(d=>ws.some(w=>w.length>3&&d.name.toLowerCase().includes(w)));}
+    f?matched.push(f):unmatched.push(raw);
   });
-
-  const matchedIds=new Set(matched.map(m=>m.id));
-  const sugg=new Set();
-  matched.forEach(m=>{
-    MASTER.forEach(d=>{
-      if(!matchedIds.has(d.id)&&!sugg.has(d.id)&&d.status!=='Inactive'){
-        if(hav(m.id,d.id)<=NEARBY_KM) sugg.add(d.id);
-      }
-    });
-  });
-
+  const mIds=new Set(matched.map(m=>m.id)),sugg=new Set();
+  matched.forEach(m=>MASTER.forEach(d=>{if(!mIds.has(d.id)&&!sugg.has(d.id)&&d.status!=='Inactive'&&hav(m.id,d.id)<=NEARBY_KM) sugg.add(d.id);}));
   showProg(100,'Done!');
-  pendingUpload={matched,suggestions:[...sugg],matchedIds,unmatched};
-  document.getElementById('sumTotal').textContent=uploadedNames.length;
-  document.getElementById('sumMatch').textContent=matched.length+' of '+uploadedNames.length;
+  pendingUpload={matched,suggestions:[...sugg],matchedIds:mIds,unmatched};
+  document.getElementById('sumTotal').textContent=names.length;
+  document.getElementById('sumMatch').textContent=matched.length+' of '+names.length;
   document.getElementById('sumSugg').textContent=sugg.size+' nearby';
-  if(unmatched.length){
-    document.getElementById('sumUnm').textContent=unmatched.slice(0,3).join(', ')+(unmatched.length>3?'…':'');
-    document.getElementById('unmRow').style.display='flex';
-  } else document.getElementById('unmRow').style.display='none';
+  if(unmatched.length){document.getElementById('sumUnm').textContent=unmatched.slice(0,3).join(', ')+(unmatched.length>3?'…':'');document.getElementById('unmRow').style.display='flex';}
+  else document.getElementById('unmRow').style.display='none';
   document.getElementById('upSum').style.display='block';
   setTimeout(hideProg,600);
 }
@@ -658,35 +809,15 @@ function applyUpload(){
   if(!pendingUpload) return;
   MASTER.forEach(d=>{d.planKind='normal';d.nearbyDist=null;});
   pendingUpload.matched.forEach(m=>{m.planKind='planned';});
-  pendingUpload.suggestions.forEach(id=>{
-    const minD=Math.min(...[...pendingUpload.matchedIds].map(mid=>hav(mid,id)));
-    MASTER[id].planKind='suggested';MASTER[id].nearbyDist=+minD.toFixed(1);
-  });
-  picked.clear();
-  pendingUpload.matched.forEach(m=>picked.add(m.id));
-  document.getElementById('navMand').style.display='flex';
-  document.getElementById('navMand').textContent=pendingUpload.matched.length+' planned';
-  document.getElementById('upSum').style.display='none';
-  pendingUpload=null;
+  pendingUpload.suggestions.forEach(id=>{const md=Math.min(...[...pendingUpload.matchedIds].map(mid=>hav(mid,id)));MASTER[id].planKind='suggested';MASTER[id].nearbyDist=+md.toFixed(1);});
+  picked.clear();pendingUpload.matched.forEach(m=>picked.add(m.id));
+  document.getElementById('navMand').style.display='flex';document.getElementById('navMand').textContent=pendingUpload.matched.length+' planned';
+  document.getElementById('upSum').style.display='none';pendingUpload=null;
   resetPlan();buildCityTabs();refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();
-  toast(`✅ ${D().filter(d=>d.planKind==='planned').length} planned · ${D().filter(d=>d.planKind==='suggested').length} nearby suggested`);
+  toast('✅ '+MASTER.filter(d=>d.planKind==='planned').length+' planned · '+MASTER.filter(d=>d.planKind==='suggested').length+' nearby');
 }
-
-function resetUpload(){
-  MASTER.forEach(d=>{d.planKind='normal';d.nearbyDist=null;});
-  pendingUpload=null;
-  document.getElementById('upSum').style.display='none';
-  document.getElementById('fileIn').value='';
-  document.getElementById('navMand').style.display='none';
-  picked.clear();resetPlan();refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();
-  toast('Upload cleared');
-}
-
-function showProg(pct,txt){
-  document.getElementById('progWrap').style.display='block';
-  document.getElementById('pFill').style.width=pct+'%';
-  document.getElementById('pTxt').textContent=txt;
-}
+function resetUpload(){MASTER.forEach(d=>{d.planKind='normal';d.nearbyDist=null;});pendingUpload=null;document.getElementById('upSum').style.display='none';document.getElementById('fileIn').value='';document.getElementById('navMand').style.display='none';picked.clear();resetPlan();refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();toast('Cleared');}
+function showProg(p,t){document.getElementById('progWrap').style.display='block';document.getElementById('pFill').style.width=p+'%';document.getElementById('pTxt').textContent=t;}
 function hideProg(){document.getElementById('progWrap').style.display='none';}
 
 // Drag-drop
@@ -695,204 +826,116 @@ ui.addEventListener('dragover',e=>{e.preventDefault();ui.classList.add('drag');}
 ui.addEventListener('dragleave',()=>ui.classList.remove('drag'));
 ui.addEventListener('drop',e=>{e.preventDefault();ui.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)handleFile(f);});
 
-/* ══ HELPER: current dataset ══ */
-function D(){return MASTER;}
-
 /* ══ NEARBY ══ */
-function getNearby(id,lim=5){
-  return MASTER.filter(d=>d.id!==id&&d.status!=='Inactive')
-    .map(d=>({...d,_d:hav(id,d.id)}))
-    .filter(d=>d._d<=NEARBY_KM).sort((a,b)=>a._d-b._d).slice(0,lim);
-}
+function getNearby(id,lim=5){return MASTER.filter(d=>d.id!==id&&d.status!=='Inactive').map(d=>({...d,_d:hav(id,d.id)})).filter(d=>d._d<=NEARBY_KM).sort((a,b)=>a._d-b._d).slice(0,lim);}
 
-/* ══ NEAREST-NEIGHBOR TSP ══ */
-function nn(ids){
-  if(!ids.length) return [];
-  let cur=[...ids].sort((a,b)=>MASTER[b].score-MASTER[a].score)[0];
-  const vis=new Set([cur]),res=[cur];
-  while(vis.size<ids.length){
-    let best=-1,bd=Infinity;
-    for(const id of ids) if(!vis.has(id)){const dd=hav(cur,id);if(dd<bd){bd=dd;best=id;}}
-    if(best<0) break; vis.add(best);res.push(best);cur=best;
-  }
-  return res;
-}
+/* ══ TSP ══ */
+function nn(ids){if(!ids.length)return[];let cur=[...ids].sort((a,b)=>MASTER[b].score-MASTER[a].score)[0];const vis=new Set([cur]),res=[cur];while(vis.size<ids.length){let best=-1,bd=Infinity;for(const id of ids)if(!vis.has(id)){const dd=hav(cur,id);if(dd<bd){bd=dd;best=id;}}if(best<0)break;vis.add(best);res.push(best);cur=best;}return res;}
 
 /* ══ DAY PLANNING ══ */
 function buildPlan(ids){
-  const byCity={};
-  ids.forEach(id=>{const c=MASTER[id].city;if(!byCity[c])byCity[c]=[];byCity[c].push(id);});
+  const byCity={};ids.forEach(id=>{const c=MASTER[id].city;if(!byCity[c])byCity[c]=[];byCity[c].push(id);});
   const cdArr=Object.entries(byCity).map(([city,cids])=>({city,ids:nn(cids)}));
-  const sorted=sortCities(cdArr);
-  const days=[];let dn=1,prevCC=null;
+  const sorted=sortCities(cdArr);const days=[];let dn=1,prevCC=null;
   sorted.forEach((cd,ci)=>{
     const anchor=MASTER[cd.ids[0]];
-    if(prevCC){
-      const dist=havXY(prevCC[0],prevCC[1],anchor.lat,anchor.lng);
-      if(dist>TRAVEL_KM){
-        const mode=dist>400?'✈️ Flight':dist>100?'🚆 Train':'🚗 Drive';
-        const hrs=dist>400?1.5:Math.round(dist/(dist>100?80:50));
-        days.push({dn,type:'travel',from:sorted[ci-1].city,to:cd.city,dist:Math.round(dist),mode,hrs});
-        dn++;
-      }
-    }
-    for(let i=0;i<cd.ids.length;i+=MAX_DAY){
-      const chunk=cd.ids.slice(i,i+MAX_DAY);
-      let km=0; for(let j=0;j<chunk.length-1;j++) km+=hav(chunk[j],chunk[j+1]);
-      const mins=chunk.length*40+Math.round(km*3);
-      const parts=Math.ceil(cd.ids.length/MAX_DAY);
-      days.push({dn,type:'visit',city:cd.city,stops:chunk,km:+km.toFixed(1),mins,part:parts>1?i/MAX_DAY+1:0,totalParts:parts});
-      dn++;
-    }
+    if(prevCC){const dist=havXY(prevCC[0],prevCC[1],anchor.lat,anchor.lng);if(dist>TRAVEL_KM){const mode=dist>400?'✈️ Flight':dist>100?'🚆 Train':'🚗 Drive';const hrs=dist>400?1.5:Math.round(dist/(dist>100?80:50));days.push({dn,type:'travel',from:sorted[ci-1].city,to:cd.city,dist:Math.round(dist),mode,hrs});dn++;}}
+    for(let i=0;i<cd.ids.length;i+=MAX_DAY){const chunk=cd.ids.slice(i,i+MAX_DAY);let km=0;for(let j=0;j<chunk.length-1;j++)km+=hav(chunk[j],chunk[j+1]);const mins=chunk.length*40+Math.round(km*3);const parts=Math.ceil(cd.ids.length/MAX_DAY);days.push({dn,type:'visit',city:cd.city,stops:chunk,km:+km.toFixed(1),mins,part:parts>1?i/MAX_DAY+1:0,totalParts:parts});dn++;}
     prevCC=[anchor.lat,anchor.lng];
   });
   return days;
 }
-
-function sortCities(arr){
-  if(arr.length<=1) return arr;
-  const rem=[...arr];
-  let si=0; rem.forEach((c,i)=>{if(MASTER[c.ids[0]].lat<MASTER[rem[si].ids[0]].lat) si=i;});
-  const res=[rem.splice(si,1)[0]];
-  while(rem.length){
-    const ll=MASTER[res[res.length-1].ids[0]]; let bi=0,bd=Infinity;
-    rem.forEach((c,i)=>{const dd=havXY(ll.lat,ll.lng,MASTER[c.ids[0]].lat,MASTER[c.ids[0]].lng);if(dd<bd){bd=dd;bi=i;}});
-    res.push(rem.splice(bi,1)[0]);
-  }
-  return res;
-}
+function sortCities(arr){if(arr.length<=1)return arr;const rem=[...arr];let si=0;rem.forEach((c,i)=>{if(MASTER[c.ids[0]].lat<MASTER[rem[si].ids[0]].lat)si=i;});const res=[rem.splice(si,1)[0]];while(rem.length){const ll=MASTER[res[res.length-1].ids[0]];let bi=0,bd=Infinity;rem.forEach((c,i)=>{const dd=havXY(ll.lat,ll.lng,MASTER[c.ids[0]].lat,MASTER[c.ids[0]].lng);if(dd<bd){bd=dd;bi=i;}});res.push(rem.splice(bi,1)[0]);}return res;}
 
 /* ══ MARKERS ══ */
-function getSD(id){
-  for(const day of dayPlan){
-    if(day.type!=='visit') continue;
-    const pos=day.stops.indexOf(id);
-    if(pos>=0){
-      let cum=0; for(const dd of dayPlan){if(dd.type==='visit'&&dd.dn<day.dn) cum+=dd.stops.length;}
-      return{gs:cum+pos+1,dn:day.dn,dc:DAY_COLORS[(day.dn-1)%DAY_COLORS.length]};
-    }
-  }
-  return{gs:0,dn:0,dc:null};
-}
+function getSD(id){for(const day of dayPlan){if(day.type!=='visit')continue;const pos=day.stops.indexOf(id);if(pos>=0){let cum=0;for(const dd of dayPlan){if(dd.type==='visit'&&dd.dn<day.dn)cum+=dd.stops.length;}return{gs:cum+pos+1,dn:day.dn,dc:DAY_COLORS[(day.dn-1)%DAY_COLORS.length]};}}return{gs:0,dn:0,dc:null};}
 
-function mkIcon(d,gs,dc,isPicked){
-  const sc=STATUS_COLOR[d.status]||'#6b7aad';
-  const isPlanned=d.planKind==='planned';
-  const isSugg=d.planKind==='suggested';
-  const dead=d.status==='Inactive';
-
-  if(gs>0&&dc){
-    const sz=28,mb=isPlanned?`<div style="position:absolute;top:-4px;right:-4px;width:10px;height:10px;background:var(--mand);border-radius:50%;border:1.5px solid #000"></div>`:'';
-    return L.divIcon({html:`<div style="position:relative;width:${sz}px;height:${sz}px"><div style="width:${sz}px;height:${sz}px;background:${dc};border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:#fff;box-shadow:0 0 0 3px ${dc}88,0 3px 16px rgba(0,0,0,.8)">${gs}</div>${mb}</div>`,className:'',iconAnchor:[sz/2,sz/2],iconSize:[sz,sz]});
-  }
-  if(isPlanned){
-    return L.divIcon({html:`<div style="width:24px;height:24px;background:var(--mand);border:${isPicked?'3px solid #fff':'2px solid #f5a623'};border-radius:50%;box-shadow:0 0 0 4px rgba(245,166,35,.4),0 3px 12px rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;font-size:13px">📋</div>`,className:'',iconAnchor:[12,12],iconSize:[24,24]});
-  }
-  if(isSugg){
-    return L.divIcon({html:`<div style="width:22px;height:22px;background:#0fd47a;border:${isPicked?'3px solid #fff':'2px solid #0fd47a'};border-radius:50%;box-shadow:0 0 0 4px rgba(15,212,122,.3),0 2px 10px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:12px">💡</div>`,className:'',iconAnchor:[11,11],iconSize:[22,22]});
-  }
-  if(isPicked){
-    return L.divIcon({html:`<div style="width:20px;height:20px;background:${sc};border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 2px ${sc},0 3px 12px rgba(0,0,0,.7)"></div>`,className:'',iconAnchor:[10,10],iconSize:[20,20]});
-  }
+function mkIcon(d,gs,dc,ip){
+  const sc=STATUS_COLOR[d.status]||'#6b7aad',dead=d.status==='Inactive';
+  if(gs>0&&dc){const sz=28,mb=d.planKind==='planned'?`<div style="position:absolute;top:-4px;right:-4px;width:10px;height:10px;background:var(--mand);border-radius:50%;border:1.5px solid #000"></div>`:'';return L.divIcon({html:`<div style="position:relative;width:${sz}px;height:${sz}px"><div style="width:${sz}px;height:${sz}px;background:${dc};border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:#fff;box-shadow:0 0 0 3px ${dc}88,0 3px 16px rgba(0,0,0,.8)">${gs}</div>${mb}</div>`,className:'',iconAnchor:[sz/2,sz/2],iconSize:[sz,sz]});}
+  if(d.planKind==='planned'){return L.divIcon({html:`<div style="width:24px;height:24px;background:var(--mand);border:${ip?'3px solid #fff':'2px solid #f5a623'};border-radius:50%;box-shadow:0 0 0 4px rgba(245,166,35,.4),0 3px 12px rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;font-size:13px">📋</div>`,className:'',iconAnchor:[12,12],iconSize:[24,24]});}
+  if(d.planKind==='suggested'){return L.divIcon({html:`<div style="width:22px;height:22px;background:#0fd47a;border:${ip?'3px solid #fff':'2px solid #0fd47a'};border-radius:50%;box-shadow:0 0 0 4px rgba(15,212,122,.3),0 2px 10px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:12px">💡</div>`,className:'',iconAnchor:[11,11],iconSize:[22,22]});}
+  if(ip){return L.divIcon({html:`<div style="width:20px;height:20px;background:${sc};border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 2px ${sc},0 3px 12px rgba(0,0,0,.7)"></div>`,className:'',iconAnchor:[10,10],iconSize:[20,20]});}
   const sz=dead?8:d.status==='Key Account'?14:11;
   const op=dead?0.2:cityF==='ALL'?0.65:(d.city===cityF?0.7:0.15);
   return L.divIcon({html:`<div style="width:${sz}px;height:${sz}px;background:${sc};border:1.5px solid ${CITY_COLORS[d.city]||'#4f7fff'};border-radius:50%;opacity:${op}"></div>`,className:'',iconAnchor:[sz/2,sz/2],iconSize:[sz,sz]});
 }
 
-function refreshMkrs(){
-  mkrs.forEach(m=>m.remove());mkrs=[];
-  MASTER.forEach(d=>{
-    const sd=getSD(d.id),ip=picked.has(d.id);
-    const zi=sd.dc?3000:d.planKind==='planned'?2500:ip?2000:d.planKind==='suggested'?1500:100;
-    mkrs.push(L.marker([d.lat,d.lng],{icon:mkIcon(d,sd.gs,sd.dc,ip),zIndexOffset:zi}).addTo(map).on('click',()=>openDP(d.id)));
-  });
-}
+function refreshMkrs(){mkrs.forEach(m=>m.remove());mkrs=[];MASTER.forEach(d=>{const sd=getSD(d.id),ip=picked.has(d.id);const zi=sd.dc?3000:d.planKind==='planned'?2500:ip?2000:d.planKind==='suggested'?1500:100;mkrs.push(L.marker([d.lat,d.lng],{icon:mkIcon(d,sd.gs,sd.dc,ip),zIndexOffset:zi}).addTo(map).on('click',()=>openDP(d.id)));});}
 
-function drawRoutes(){
-  polys.forEach(p=>p.remove());polys=[];arrMkrs.forEach(a=>a.remove());arrMkrs=[];
-  dayPlan.forEach((day,di)=>{
-    if(day.type!=='visit') return;
-    const col=DAY_COLORS[di%DAY_COLORS.length];
-    const pts=day.stops.map(id=>[MASTER[id].lat,MASTER[id].lng]);
-    if(pts.length<2) return;
-    polys.push(L.polyline(pts,{color:col,weight:3,opacity:.9,dashArray:'8 4'}).addTo(map));
-    for(let i=0;i<pts.length-1;i++){
-      const mid=[(pts[i][0]+pts[i+1][0])/2,(pts[i][1]+pts[i+1][1])/2];
-      const ang=Math.atan2(pts[i+1][1]-pts[i][1],pts[i+1][0]-pts[i][0])*180/Math.PI;
-      arrMkrs.push(L.marker(mid,{icon:L.divIcon({html:`<div style="color:${col};font-size:11px;transform:rotate(${ang}deg);opacity:.9;line-height:1">▶</div>`,className:'',iconAnchor:[6,6]})}).addTo(map));
-    }
-  });
-  const vd=dayPlan.filter(d=>d.type==='visit');
-  for(let i=0;i<vd.length-1;i++){
-    if(vd[i].city!==vd[i+1].city){
-      const a=MASTER[vd[i].stops[0]],b=MASTER[vd[i+1].stops[0]];
-      polys.push(L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#4f7fff',weight:1.5,opacity:.35,dashArray:'4 6'}).addTo(map));
-    }
-  }
-}
+function drawRoutes(){polys.forEach(p=>p.remove());polys=[];arrMkrs.forEach(a=>a.remove());arrMkrs=[];dayPlan.forEach((day,di)=>{if(day.type!=='visit')return;const col=DAY_COLORS[di%DAY_COLORS.length];const pts=day.stops.map(id=>[MASTER[id].lat,MASTER[id].lng]);if(pts.length<2)return;polys.push(L.polyline(pts,{color:col,weight:3,opacity:.9,dashArray:'8 4'}).addTo(map));for(let i=0;i<pts.length-1;i++){const mid=[(pts[i][0]+pts[i+1][0])/2,(pts[i][1]+pts[i+1][1])/2];const ang=Math.atan2(pts[i+1][1]-pts[i][1],pts[i+1][0]-pts[i][0])*180/Math.PI;arrMkrs.push(L.marker(mid,{icon:L.divIcon({html:`<div style="color:${col};font-size:11px;transform:rotate(${ang}deg);opacity:.9;line-height:1">▶</div>`,className:'',iconAnchor:[6,6]})}).addTo(map));}});const vd=dayPlan.filter(d=>d.type==='visit');for(let i=0;i<vd.length-1;i++){if(vd[i].city!==vd[i+1].city){const a=MASTER[vd[i].stops[0]],b=MASTER[vd[i+1].stops[0]];polys.push(L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#4f7fff',weight:1.5,opacity:.35,dashArray:'4 6'}).addTo(map));}}}
 
-/* ══ DETAIL PANEL ══ */
-function openDP(id){
-  curDP=id; const d=MASTER[id];
-  const cc=CITY_COLORS[d.city]||'#4f7fff';
-  const sd=getSD(id); const ip=picked.has(id);
-  document.getElementById('dpCity').textContent=d.city;
-  document.getElementById('dpCity').style.cssText=`background:${cc}22;color:${cc};border:1px solid ${cc}44`;
-  document.getElementById('dpZone').textContent=d.zone||'No zone';
-  const ptEl=document.getElementById('dpPlanTag');
-  if(d.planKind==='planned') ptEl.innerHTML='<span class="mtag">📋 In your list</span>';
-  else if(d.planKind==='suggested') ptEl.innerHTML=`<span class="stag">💡 Nearby ${d.nearbyDist||''}${d.nearbyDist?'km':''}`;
-  else ptEl.innerHTML='';
+/* ══ DETAIL PANEL (responsive) ══ */
+function buildDPContent(id){
+  const d=MASTER[id];const cc=CITY_COLORS[d.city]||'#4f7fff';const sd=getSD(id);const ip=picked.has(id);
+  const pct=Math.min(100,Math.round((1-d.lastVisit/90)*100));
+  const pc=pct>=60?'#0fd47a':pct>=30?'#f5a623':'#f04f5b';
+  const reasons=[];
+  if(d.planKind==='planned') reasons.push('📋 In your uploaded party list');
+  if(d.planKind==='suggested') reasons.push(`💡 ${d.nearbyDist}km from a planned party`);
+  if(d.lastVisit>=30) reasons.push(`⚠ Not visited in ${d.lastVisit} days`);
+  if(d.status==='Key Account') reasons.push('🏆 Key Account — top priority');
+  if(!reasons.length) reasons.push('Regular territory visit');
   const db=sd.dc?`<span style="font-family:var(--mo);font-size:10px;background:${sd.dc};color:#fff;padding:1px 7px;border-radius:6px;margin-left:5px">Day ${sd.dn} · Stop ${sd.gs}</span>`:'';
-  document.getElementById('dpName').innerHTML=`${d.name} <span class="sp ${STATUS_CL[d.status]||'sp-act'}">${d.status}</span>${db}`;
-  document.getElementById('dpGrid').innerHTML=`
-    <div class="dp-stat"><div class="v" style="color:${STATUS_COLOR[d.status]}">${d.status}</div><div class="l">Status</div></div>
-    <div class="dp-stat"><div class="v" style="color:${cc}">${d.zone||'—'}</div><div class="l">Zone</div></div>
-    <div class="dp-stat"><div class="v">${d.lastVisit}d</div><div class="l">Since Last Visit</div></div>
-    <div class="dp-stat"><div class="v">${d.salesman}</div><div class="l">Salesman</div></div>`;
-  document.getElementById('dpRows').innerHTML=`
+  const ptag=d.planKind==='planned'?'<span class="mtag">📋 In List</span>':d.planKind==='suggested'?`<span class="stag">💡 Nearby</span>`:'';
+  const nearby=getNearby(id);
+  const nearbyHtml=nearby.length?`<div class="nearby-sec"><div class="nearby-t">💡 Nearby Parties (within 25km)</div>${nearby.map(n=>`<div class="nitem" onclick="openDP(${n.id})"><div style="width:8px;height:8px;border-radius:50%;background:${STATUS_COLOR[n.status]||'#6b7aad'};flex-shrink:0"></div><div class="nname">${n.name}</div><span class="sp ${STATUS_CL[n.status]||'sp-act'}" style="flex-shrink:0">${n.status}</span><span class="nkm">${n._d.toFixed(1)}km</span><span class="nadd" onclick="event.stopPropagation();toggleId(${n.id})">${picked.has(n.id)?'✓':'+'}</span></div>`).join('')}</div>`:'';
+  const actHtml=ip?`<button class="dp-act on" onclick="togglePickFromDetail(${id})">✓ In your route — click to remove</button>`:`<button class="dp-act" onclick="togglePickFromDetail(${id})">+ Add to route plan</button>`;
+  return `
+    <div class="dp-tags">
+      <span class="dp-ctag" style="background:${cc}22;color:${cc};border:1px solid ${cc}44">${d.city}</span>
+      <span class="dp-ktag">${d.zone||'No zone'}</span>
+      ${ptag}
+    </div>
+    <div class="dp-name">${d.name} <span class="sp ${STATUS_CL[d.status]||'sp-act'}">${d.status}</span>${db}</div>
+    <div class="dp-grid">
+      <div class="dp-stat"><div class="v" style="color:${STATUS_COLOR[d.status]}">${d.status}</div><div class="l">Status</div></div>
+      <div class="dp-stat"><div class="v" style="color:${cc}">${d.zone||'—'}</div><div class="l">Zone</div></div>
+      <div class="dp-stat"><div class="v">${d.lastVisit}d</div><div class="l">Last Visit</div></div>
+      <div class="dp-stat"><div class="v">${d.salesman}</div><div class="l">Salesman</div></div>
+    </div>
     <div class="dp-row"><span class="k">City</span><span class="vv">${d.city}, ${d.state}</span></div>
     <div class="dp-row"><span class="k">Dealer Zone</span><span class="vv">${d.zone||'—'}</span></div>
     <div class="dp-row"><span class="k">User Status</span><span class="vv">${d.status}</span></div>
     <div class="dp-row"><span class="k">Last Visited</span><span class="vv">${d.lastVisit} days ago</span></div>
-    <div class="dp-row"><span class="k">In Plan</span><span class="vv">${d.planKind==='planned'?'✓ Yes':d.planKind==='suggested'?'💡 Suggested':'No'}</span></div>`;
-  const pct=Math.min(100,Math.round((1-d.lastVisit/90)*100));
-  const pc=pct>=60?'#0fd47a':pct>=30?'#f5a623':'#f04f5b';
-  document.getElementById('dpBar').style.cssText=`width:${Math.max(5,pct)}%;background:${pc}`;
-  document.getElementById('dpPct').textContent=`${d.lastVisit} days since last visit`;
-  const reasons=[];
-  if(d.planKind==='planned') reasons.push('📋 You included this in your uploaded party list');
-  if(d.planKind==='suggested') reasons.push(`💡 ${d.nearbyDist}km from a party in your list — efficient to club`);
-  if(d.lastVisit>=30) reasons.push(`⚠ Overdue — last visited ${d.lastVisit} days ago`);
-  if(d.status==='Key Account') reasons.push('🏆 Key Account — high priority visit');
-  if(!reasons.length) reasons.push('Regular territory visit');
-  document.getElementById('dpWhy').innerHTML=`<div class="why-t">Why Visit?</div>${reasons.join('<br>')}`;
-  const btn=document.getElementById('dpAct');
-  if(ip){btn.className='dp-act on';btn.innerHTML='✓ In your route — click to remove';}
-  else{btn.className='dp-act';btn.innerHTML='+ Add to route plan';}
-  const nearby=getNearby(id);
-  const nbEl=document.getElementById('dpNearby');
-  if(nearby.length){
-    nbEl.style.display='block';
-    document.getElementById('dpNearbyList').innerHTML=nearby.map(n=>`
-      <div class="nitem" onclick="openDP(${n.id})">
-        <div style="width:8px;height:8px;border-radius:50%;background:${STATUS_COLOR[n.status]||'#6b7aad'};flex-shrink:0"></div>
-        <div class="nname">${n.name}</div>
-        <span class="sp ${STATUS_CL[n.status]||'sp-act'}" style="flex-shrink:0">${n.status}</span>
-        <span class="nkm">${n._d.toFixed(1)}km</span>
-        <span class="nadd" onclick="event.stopPropagation();toggleId(${n.id})">${picked.has(n.id)?'✓':'+'}</span>
-      </div>`).join('');
-  } else nbEl.style.display='none';
-  document.getElementById('dp').classList.add('show');
-  document.getElementById('legend').style.display='none';
+    <div style="margin-top:8px">
+      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Visit Recency</div>
+      <div class="pbar"><div class="pfill" style="width:${Math.max(5,pct)}%;background:${pc}"></div></div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px">${d.lastVisit} days since last visit</div>
+    </div>
+    <div class="whybox"><div class="why-t">Why Visit?</div>${reasons.join('<br>')}</div>
+    ${actHtml}
+    ${nearbyHtml}`;
+}
+
+function openDP(id){
+  curDP=id;const d=MASTER[id];
   map.setView([d.lat,d.lng],12,{animate:true});
+  if(isMobile()){
+    // Mobile: bottom sheet
+    document.getElementById('sheetContent').innerHTML=`<button class="dpclose" style="float:right" onclick="closeSheet()">×</button>`+buildDPContent(id);
+    document.getElementById('bottomSheet').classList.add('show');
+    document.getElementById('sheetOverlay').classList.add('show');
+  } else {
+    // Desktop: overlay panel
+    const dp=document.getElementById('dp');
+    dp.querySelector('.dpi').innerHTML=`<button class="dpclose" onclick="closeDP()">×</button>`+buildDPContent(id);
+    dp.classList.add('show');
+    document.getElementById('legend').style.display='none';
+  }
 }
 function closeDP(){document.getElementById('dp').classList.remove('show');document.getElementById('legend').style.display='block';curDP=-1;}
-function togglePickDP(){if(curDP<0)return;toggleId(curDP);openDP(curDP);}
+function closeSheet(){document.getElementById('bottomSheet').classList.remove('show');document.getElementById('sheetOverlay').classList.remove('show');curDP=-1;}
+
+function togglePickFromDetail(id){
+  toggleId(id);
+  openDP(id); // refresh
+}
+function togglePickDP(){if(curDP>=0){toggleId(curDP);openDP(curDP);}}
 
 function toggleId(id){
   picked.has(id)?picked.delete(id):picked.add(id);
-  if(dayPlan.length) resetPlan();
+  if(dayPlan.length)resetPlan();
   refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();
 }
 
@@ -900,388 +943,156 @@ function toggleId(id){
 function buildCityTabs(){
   const cities=[...new Set(MASTER.map(d=>d.city))].sort();
   let html=`<div class="ctab on" data-city="ALL" onclick="setCity('ALL')"><div class="cdot" style="background:#4f7fff"></div><span>All</span></div>`;
-  cities.forEach(c=>{
-    const col=CITY_COLORS[c]||'#4f7fff';
-    html+=`<div class="ctab" data-city="${c}" onclick="setCity('${c}')"><div class="cdot" style="background:${col}"></div><span>${c.charAt(0)+c.slice(1).toLowerCase()}</span></div>`;
-  });
+  cities.forEach(c=>{const col=CITY_COLORS[c]||'#4f7fff';html+=`<div class="ctab" data-city="${c}" onclick="setCity('${c}')"><div class="cdot" style="background:${col}"></div><span>${c.charAt(0)+c.slice(1).toLowerCase()}</span></div>`;});
   document.getElementById('cityTabs').innerHTML=html;
 }
-
-function updateCityTabs(){
-  document.querySelectorAll('.ctab').forEach(t=>{
-    const city=t.dataset.city;
-    const old=t.querySelector('.cbadge'); if(old) old.remove();
-    const cnt=city==='ALL'?picked.size:MASTER.filter(d=>d.city===city&&picked.has(d.id)).length;
-    if(cnt>0){const b=document.createElement('span');b.className='cbadge';b.textContent=cnt;t.appendChild(b);}
-  });
-}
-
-function setCity(city){
-  cityF=city;
-  document.querySelectorAll('.ctab').forEach(t=>t.classList.toggle('on',t.dataset.city===city));
-  if(city!=='ALL'){
-    const ds=MASTER.filter(d=>d.city===city);
-    if(ds.length) map.fitBounds(L.latLngBounds(ds.map(d=>[d.lat,d.lng])).pad(.2));
-  } else fitView();
-  renderList();refreshMkrs();
-}
+function updateCityTabs(){document.querySelectorAll('.ctab').forEach(t=>{const city=t.dataset.city;const old=t.querySelector('.cbadge');if(old)old.remove();const cnt=city==='ALL'?picked.size:MASTER.filter(d=>d.city===city&&picked.has(d.id)).length;if(cnt>0){const b=document.createElement('span');b.className='cbadge';b.textContent=cnt;t.appendChild(b);}});}
+function setCity(city){cityF=city;document.querySelectorAll('.ctab').forEach(t=>t.classList.toggle('on',t.dataset.city===city));if(city!=='ALL'){const ds=MASTER.filter(d=>d.city===city);if(ds.length)map.fitBounds(L.latLngBounds(ds.map(d=>[d.lat,d.lng])).pad(.2));}else fitView();renderList();refreshMkrs();}
 
 /* ══ SEL STRIP ══ */
 function updateSelStrip(){
-  const strip=document.getElementById('selStrip');
-  const empty=document.getElementById('ssEmpty');
+  const strip=document.getElementById('selStrip'),empty=document.getElementById('ssEmpty');
   strip.querySelectorAll('.sschip').forEach(c=>c.remove());
-  if(!picked.size){empty.style.display='';return;}
-  empty.style.display='none';
-  const bc={};
-  picked.forEach(id=>{const c=MASTER[id].city;bc[c]=(bc[c]||0)+1;});
-  Object.entries(bc).forEach(([city,cnt])=>{
-    const col=CITY_COLORS[city]||'#4f7fff';
-    const chip=document.createElement('div');chip.className='sschip';
-    chip.style.cssText=`background:${col}22;color:${col};border:1px solid ${col}44`;
-    chip.innerHTML=`<span style="width:6px;height:6px;border-radius:50%;background:${col};display:inline-block;flex-shrink:0"></span>${city.charAt(0)+city.slice(1).toLowerCase()} <b style="font-family:var(--mo)">${cnt}</b>`;
-    chip.onclick=()=>setCity(city);
-    strip.appendChild(chip);
-  });
+  if(!picked.size){empty.style.display='';return;}empty.style.display='none';
+  const bc={};picked.forEach(id=>{const c=MASTER[id].city;bc[c]=(bc[c]||0)+1;});
+  Object.entries(bc).forEach(([city,cnt])=>{const col=CITY_COLORS[city]||'#4f7fff';const chip=document.createElement('div');chip.className='sschip';chip.style.cssText=`background:${col}22;color:${col};border:1px solid ${col}44`;chip.innerHTML=`<span style="width:6px;height:6px;border-radius:50%;background:${col};display:inline-block;flex-shrink:0"></span>${city.charAt(0)+city.slice(1).toLowerCase()} <b style="font-family:var(--mo)">${cnt}</b>`;chip.onclick=()=>setCity(city);strip.appendChild(chip);});
 }
 
 /* ══ RENDER LIST ══ */
-function getVisible(){
-  const q=document.getElementById('searchBox').value.toLowerCase();
-  return MASTER.filter(d=>{
-    const cOk=cityF==='ALL'||d.city===cityF;
-    const sOk=statusF==='ALL'||d.status===statusF;
-    const pOk=planF==='ALL'||(planF==='PLANNED'&&d.planKind==='planned')||(planF==='SUGGESTED'&&d.planKind==='suggested');
-    const qOk=!q||d.name.toLowerCase().includes(q)||d.city.toLowerCase().includes(q)||(d.zone||'').toLowerCase().includes(q)||d.status.toLowerCase().includes(q);
-    return cOk&&sOk&&pOk&&qOk;
-  });
-}
+function getVisible(){const q=document.getElementById('searchBox').value.toLowerCase();return MASTER.filter(d=>{const cOk=cityF==='ALL'||d.city===cityF,sOk=statusF==='ALL'||d.status===statusF,pOk=planF==='ALL'||(planF==='PLANNED'&&d.planKind==='planned')||(planF==='SUGGESTED'&&d.planKind==='suggested'),qOk=!q||d.name.toLowerCase().includes(q)||d.city.toLowerCase().includes(q)||(d.zone||'').toLowerCase().includes(q)||d.status.toLowerCase().includes(q);return cOk&&sOk&&pOk&&qOk;});}
 
 function renderList(){
-  const dealers=getVisible();
-  const list=document.getElementById('dlist');
+  const dealers=getVisible(),list=document.getElementById('dlist');
   if(!dealers.length){list.innerHTML=`<div class="empt"><div class="ei">🔍</div><p>No dealers match.</p></div>`;updateFooter();return;}
-  dealers.sort((a,b)=>{
-    const ko={planned:0,suggested:1,normal:2};
-    const ka=ko[a.planKind]||2,kb=ko[b.planKind]||2;
-    if(ka!==kb) return ka-kb;
-    const pa=picked.has(a.id)?0:1,pb=picked.has(b.id)?0:1;
-    if(pa!==pb) return pa-pb;
-    return b.score-a.score;
-  });
-  const groups={};
-  dealers.forEach(d=>{if(!groups[d.city])groups[d.city]=[];groups[d.city].push(d);});
+  dealers.sort((a,b)=>{const ko={planned:0,suggested:1,normal:2};const ka=ko[a.planKind]||2,kb=ko[b.planKind]||2;if(ka!==kb)return ka-kb;const pa=picked.has(a.id)?0:1,pb=picked.has(b.id)?0:1;if(pa!==pb)return pa-pb;return b.score-a.score;});
+  const groups={};dealers.forEach(d=>{if(!groups[d.city])groups[d.city]=[];groups[d.city].push(d);});
   let html='';
   Object.entries(groups).forEach(([city,items])=>{
-    const col=CITY_COLORS[city]||'#4f7fff';
-    const sc=items.filter(d=>picked.has(d.id)).length;
-    const pc=items.filter(d=>d.planKind==='planned').length;
-    const gc=items.filter(d=>d.planKind==='suggested').length;
-    const allSel=sc===items.length&&items.length>0;
-    html+=`<div class="ghdr">
-      <div class="gcity" style="color:${col}">${city}${pc?` <span style="font-size:9px;color:var(--mand)">${pc}📋</span>`:''}${gc?` <span style="font-size:9px;color:var(--gn)">${gc}💡</span>`:''}</div>
-      <div class="gacts">${sc>0?`<span style="font-size:9px;font-family:var(--mo);color:${col}">${sc}✓</span>`:''}<button class="gbtn" onclick="event.stopPropagation();togCity('${city}',${allSel})">${allSel?'Desel.':'Sel. all'}</button></div>
-    </div>`;
+    const col=CITY_COLORS[city]||'#4f7fff',sc=items.filter(d=>picked.has(d.id)).length,pc=items.filter(d=>d.planKind==='planned').length,gc=items.filter(d=>d.planKind==='suggested').length,allSel=sc===items.length&&items.length>0;
+    html+=`<div class="ghdr"><div class="gcity" style="color:${col}">${city}${pc?` <span style="font-size:9px;color:var(--mand)">${pc}📋</span>`:''}${gc?` <span style="font-size:9px;color:var(--gn)">${gc}💡</span>`:''}</div><div class="gacts">${sc>0?`<span style="font-size:9px;font-family:var(--mo);color:${col}">${sc}✓</span>`:''}<button class="gbtn" onclick="event.stopPropagation();togCity('${city}',${allSel})">${allSel?'Desel.':'Sel.'}</button></div></div>`;
     items.forEach(d=>{
-      const ip=picked.has(d.id), sd=getSD(d.id);
-      const isPlanned=d.planKind==='planned', isSugg=d.planKind==='suggested';
-      let cls='drow'; if(ip) cls+=' picked'; if(isPlanned) cls+=' mand-row'; else if(isSugg) cls+=' sugg-row';
+      const ip=picked.has(d.id),sd=getSD(d.id),isP=d.planKind==='planned',isS=d.planKind==='suggested';
+      let cls='drow';if(ip)cls+=' picked';if(isP)cls+=' mand-row';else if(isS)cls+=' sugg-row';
       const db=sd.dc?`<span style="font-family:var(--mo);font-size:9px;background:${sd.dc};color:#fff;padding:0 5px;border-radius:3px;margin-right:3px">D${sd.dn}·#${sd.gs}</span>`:'';
       html+=`<div class="${cls}" onclick="toggleId(${d.id})">
         <div class="dchk"><svg viewBox="0 0 12 12"><polyline points="1.5,6 4.5,9 10.5,3"/></svg></div>
         <div class="dbody">
           <div class="dname">${db}${d.name}</div>
-          <div class="dmeta">
-            ${isPlanned?'<span class="mtag">📋 In List</span>':''}
-            ${isSugg?`<span class="stag">💡 ${d.nearbyDist}km</span>`:''}
-            <span class="sp ${STATUS_CL[d.status]||'sp-act'}">${d.status}</span>
-            <span style="font-size:9px;color:var(--t3)">${d.zone||'—'} · ${d.city}</span>
-          </div>
-          <div class="dinfo">${d.lastVisit}d since visit · Score: ${d.score}</div>
+          <div class="dmeta">${isP?'<span class="mtag">📋</span>':''}${isS?`<span class="stag">💡${d.nearbyDist}km</span>`:''}<span class="sp ${STATUS_CL[d.status]||'sp-act'}">${d.status}</span><span style="font-size:9px;color:var(--t3)">${d.zone||'—'}</span></div>
+          <div class="dinfo">${d.city} · ${d.lastVisit}d ago</div>
         </div>
-        <span class="info-btn" onclick="event.stopPropagation();openDP(${d.id})" title="View details">ℹ</span>
+        <span class="info-btn" onclick="event.stopPropagation();openDP(${d.id})" title="Details">ℹ</span>
       </div>`;
     });
   });
   list.innerHTML=html;updateFooter();
 }
 
-/* ══ PLAN ROUTE ══ */
+/* ══ PLAN ══ */
 function planRoute(){
-  if(picked.size<2){toast('Select at least 2 dealers to plan a route');return;}
-  dayPlan=buildPlan([...picked]);
-  flatRoute=dayPlan.filter(d=>d.type==='visit').flatMap(d=>d.stops);
+  if(picked.size<2){toast('Select at least 2 dealers');return;}
+  dayPlan=buildPlan([...picked]);flatRoute=dayPlan.filter(d=>d.type==='visit').flatMap(d=>d.stops);
   drawRoutes();refreshMkrs();renderList();renderRP();updateSum();
-  const pts=[...picked].map(id=>[MASTER[id].lat,MASTER[id].lng]);
-  if(pts.length>1) map.fitBounds(L.latLngBounds(pts).pad(.1));
-  const td=dayPlan.length, vd=dayPlan.filter(d=>d.type==='visit').length;
-  document.getElementById('navDays').style.display='flex';
-  document.getElementById('navDays').textContent=`${td} day trip`;
+  const pts=[...picked].map(id=>[MASTER[id].lat,MASTER[id].lng]);if(pts.length>1)map.fitBounds(L.latLngBounds(pts).pad(.1));
+  const td=dayPlan.length,vd=dayPlan.filter(d=>d.type==='visit').length;
+  document.getElementById('navDays').style.display='flex';document.getElementById('navDays').textContent=`${td} day trip`;
   document.getElementById('exportBtn').style.display='flex';
-  toast(`✅ ${picked.size} stops · ${td} days (${vd} visit days)`);
+  toast(`✅ ${picked.size} stops · ${td} days`);
 }
 
 function renderRP(){
-  const rp=document.getElementById('rpanel');
-  if(!dayPlan.length){rp.style.display='none';return;}
-  rp.style.display='block';
-  const vd=dayPlan.filter(d=>d.type==='visit');
-  document.getElementById('rpmeta').textContent=`${dayPlan.length} days · ${vd.reduce((s,d)=>s+d.stops.length,0)} stops`;
+  const rp=document.getElementById('rpanel');if(!dayPlan.length){rp.style.display='none';return;}rp.style.display='block';
+  const vd=dayPlan.filter(d=>d.type==='visit');document.getElementById('rpmeta').textContent=`${dayPlan.length} days · ${vd.reduce((s,d)=>s+d.stops.length,0)} stops`;
   let gs=0,html='';
   dayPlan.forEach((day,di)=>{
     const dc=DAY_COLORS[di%DAY_COLORS.length];
-    if(day.type==='travel'){
-      html+=`<div class="trseg"><div style="font-size:15px">${day.mode.split(' ')[0]}</div><div class="trinfo"><div class="trroute">Day ${day.dn} — Travel: ${day.from} → ${day.to}</div><div class="trmeta">${day.mode.split(' ').slice(1).join(' ')} · ~${day.hrs}h</div></div><div class="trdist">${day.dist}km</div></div>`;
-      return;
-    }
+    if(day.type==='travel'){html+=`<div class="trseg"><div style="font-size:15px">${day.mode.split(' ')[0]}</div><div class="trinfo"><div class="trroute">Day ${day.dn} — Travel: ${day.from} → ${day.to}</div><div class="trmeta">${day.mode.split(' ').slice(1).join(' ')} · ~${day.hrs}h</div></div><div class="trdist">${day.dist}km</div></div>`;return;}
     const pl=day.totalParts>1?` Pt ${day.part}/${day.totalParts}`:'';
-    html+=`<div class="dayblock"><div class="dayhdr" onclick="togDay(this)">
-      <div class="daynum" style="background:${dc}22;color:${dc};border:1px solid ${dc}44">D${day.dn}</div>
-      <div class="dayinfo"><div class="daytitle">Day ${day.dn} — ${day.city}${pl}</div><div class="daysub">${day.stops.length} stops · ${day.km}km · ~${(day.mins/60).toFixed(1)}hr</div></div>
-      <div class="daytog open">▾</div>
-    </div><div class="daystops">`;
-    day.stops.forEach((id,si)=>{
-      gs++;const d=MASTER[id];const seg=si>0?hav(day.stops[si-1],id):0;
-      html+=`<div class="stoprow" onclick="openDP(${id})">
-        <div class="snum" style="background:${dc};color:#fff">${gs}</div>
-        <div class="sbody"><div class="sname">${d.planKind==='planned'?'📋 ':d.planKind==='suggested'?'💡 ':''}${d.name}</div>
-        <div class="ssub"><span class="sp ${STATUS_CL[d.status]||'sp-act'}">${d.status}</span><span style="font-size:9px;color:var(--t3)">${d.zone||'—'}</span></div></div>
-        <div style="text-align:right;flex-shrink:0"><div class="sdist">${si===0?'Start':'+'+seg.toFixed(1)+'km'}</div><div class="sdur">~40min</div></div>
-      </div>`;
-    });
+    html+=`<div class="dayblock"><div class="dayhdr" onclick="togDay(this)"><div class="daynum" style="background:${dc}22;color:${dc};border:1px solid ${dc}44">D${day.dn}</div><div class="dayinfo"><div class="daytitle">Day ${day.dn} — ${day.city}${pl}</div><div class="daysub">${day.stops.length} stops · ${day.km}km · ~${(day.mins/60).toFixed(1)}hr</div></div><div class="daytog open">▾</div></div><div class="daystops">`;
+    day.stops.forEach((id,si)=>{gs++;const d=MASTER[id];const seg=si>0?hav(day.stops[si-1],id):0;html+=`<div class="stoprow" onclick="openDP(${id})"><div class="snum" style="background:${dc};color:#fff">${gs}</div><div class="sbody"><div class="sname">${d.planKind==='planned'?'📋 ':d.planKind==='suggested'?'💡 ':''}${d.name}</div><div class="ssub"><span class="sp ${STATUS_CL[d.status]||'sp-act'}">${d.status}</span><span style="font-size:9px;color:var(--t3)">${d.zone||'—'}</span></div></div><div style="text-align:right;flex-shrink:0"><div class="sdist">${si===0?'Start':'+'+seg.toFixed(1)+'km'}</div><div class="sdur">~40min</div></div></div>`;});
     html+=`</div></div>`;
   });
   document.getElementById('rpdays').innerHTML=html;
 }
 
-function togDay(hdr){
-  const b=hdr.nextElementSibling,t=hdr.querySelector('.daytog');
-  const open=b.style.display!=='none'; b.style.display=open?'none':''; t.classList.toggle('open',!open);
-}
+function togDay(hdr){const b=hdr.nextElementSibling,t=hdr.querySelector('.daytog');const open=b.style.display!=='none';b.style.display=open?'none':'';t.classList.toggle('open',!open);}
 
 function updateSum(){
-  const el=document.getElementById('rsum');
-  if(!dayPlan.length){el.style.display='none';return;}
-  const vd=dayPlan.filter(d=>d.type==='visit');
-  const stops=vd.reduce((s,d)=>s+d.stops.length,0);
-  let dist=vd.reduce((s,d)=>s+d.km,0);
-  dayPlan.filter(d=>d.type==='travel').forEach(d=>dist+=d.dist);
-  document.getElementById('rsDays').textContent=dayPlan.length;
-  document.getElementById('rsStops').textContent=stops;
-  document.getElementById('rsDist').textContent=Math.round(dist)+'km';
-  document.getElementById('rsCities').textContent=new Set(vd.map(d=>d.city)).size;
+  const el=document.getElementById('rsum');if(!dayPlan.length){el.style.display='none';return;}
+  const vd=dayPlan.filter(d=>d.type==='visit');let dist=vd.reduce((s,d)=>s+d.km,0);dayPlan.filter(d=>d.type==='travel').forEach(d=>dist+=d.dist);
+  document.getElementById('rsDays').textContent=dayPlan.length;document.getElementById('rsStops').textContent=vd.reduce((s,d)=>s+d.stops.length,0);document.getElementById('rsDist').textContent=Math.round(dist)+'km';document.getElementById('rsCities').textContent=new Set(vd.map(d=>d.city)).size;
   el.style.display='flex';
 }
 
-/* ══════════════════════════════════════════
-   PDF EXPORT — pure HTML/CSS printed as PDF
-══════════════════════════════════════════ */
-function openExportModal(){
-  if(!dayPlan.length){toast('Plan a route first!');return;}
-  // Set default date to today
-  const today=new Date();
-  document.getElementById('exportDate').value=today.toISOString().split('T')[0];
-  document.getElementById('exportModal').classList.add('show');
-}
+/* ══ PDF EXPORT ══ */
+function openExportModal(){if(!dayPlan.length){toast('Plan a route first!');return;}document.getElementById('exportDate').value=new Date().toISOString().split('T')[0];document.getElementById('exportModal').classList.add('show');}
 function closeExportModal(){document.getElementById('exportModal').classList.remove('show');}
-
 function exportPDF(){
-  const name=document.getElementById('exportName').value||'Salesman';
-  const dateVal=document.getElementById('exportDate').value;
-  const notes=document.getElementById('exportNotes').value;
+  const name=document.getElementById('exportName').value||'Salesman',dateVal=document.getElementById('exportDate').value,notes=document.getElementById('exportNotes').value;
   const startDate=dateVal?new Date(dateVal):new Date();
-
-  // Build full HTML for the print window
-  const vd=dayPlan.filter(d=>d.type==='visit');
-  const totalStops=vd.reduce((s,d)=>s+d.stops.length,0);
-  const cities=[...new Set(vd.map(d=>d.city))];
-
-  let bodyHtml=`
-  <html><head><title>Route Plan — ${name}</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0;}
-    body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#111;background:white;padding:0;}
-    .page{padding:20mm 18mm;min-height:297mm;}
-    @media print{.page{padding:15mm 15mm;}}
-
-    /* HEADER */
-    .header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:3px solid #1a2a6c;margin-bottom:16px;}
-    .header-left h1{font-size:20px;font-weight:800;color:#1a2a6c;letter-spacing:-.02em;}
-    .header-left h1 span{color:#e07b00;}
-    .header-left p{font-size:11px;color:#555;margin-top:3px;}
-    .header-right{text-align:right;}
-    .header-right .badge{display:inline-block;background:#1a2a6c;color:white;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;margin-bottom:4px;}
-    .header-right p{font-size:10px;color:#777;}
-
-    /* SUMMARY STRIP */
-    .summary{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px;padding:12px;background:#f5f7ff;border-radius:8px;border:1px solid #e0e5ff;}
-    .sum-box{text-align:center;}
-    .sum-box .val{font-size:18px;font-weight:800;color:#1a2a6c;}
-    .sum-box .lbl{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
-
-    /* DAY BLOCK */
-    .day-card{margin-bottom:14px;border:1px solid #dde2f0;border-radius:8px;overflow:hidden;page-break-inside:avoid;}
-    .day-card-hdr{display:flex;align-items:center;gap:10px;padding:8px 12px;color:white;}
-    .day-num-box{width:32px;height:32px;border-radius:6px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;font-family:monospace;}
-    .day-hdr-info{flex:1;}
-    .day-hdr-title{font-size:13px;font-weight:800;}
-    .day-hdr-sub{font-size:10px;opacity:.85;margin-top:1px;}
-    .day-hdr-stats{text-align:right;font-size:10px;opacity:.85;}
-
-    /* TRAVEL BLOCK */
-    .travel-card{margin-bottom:10px;padding:8px 12px;background:#f0f4ff;border:1px dashed #b0bce8;border-radius:6px;display:flex;align-items:center;gap:10px;font-size:11px;color:#444;}
-    .travel-card .mode{font-size:18px;}
-    .travel-card .tinfo{flex:1;}
-    .travel-card .tname{font-weight:700;font-size:12px;color:#1a2a6c;}
-    .travel-card .tmeta{font-size:10px;color:#666;margin-top:2px;}
-    .travel-card .tdist{font-family:monospace;font-weight:700;color:#1a2a6c;}
-
-    /* STOP ROWS */
-    .stops-table{width:100%;border-collapse:collapse;}
-    .stops-table th{background:#f5f7ff;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#555;border-bottom:1px solid #dde2f0;text-align:left;}
-    .stops-table td{padding:7px 10px;border-bottom:1px solid #eef0f8;font-size:11px;vertical-align:middle;}
-    .stops-table tr:last-child td{border-bottom:none;}
-    .stops-table tr:hover td{background:#fafbff;}
-    .stop-num{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white;font-family:monospace;}
-    .status-badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;text-transform:uppercase;}
-    .ka{background:#fef3c7;color:#92400e;}
-    .ach{background:#d1fae5;color:#065f46;}
-    .act{background:#dbeafe;color:#1e40af;}
-    .ina{background:#fee2e2;color:#991b1b;}
-    .planned-badge{font-size:8px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;padding:1px 5px;border-radius:4px;font-weight:700;}
-    .sugg-badge{font-size:8px;background:#d1fae5;color:#065f46;border:1px solid #a7f3d0;padding:1px 5px;border-radius:4px;font-weight:700;}
-
-    /* FOOTER */
-    .footer{margin-top:20px;padding-top:12px;border-top:1px solid #dde2f0;display:flex;justify-content:space-between;font-size:10px;color:#aaa;}
-
-    @page{size:A4;margin:0;}
-    @media print{
-      body{print-color-adjust:exact;-webkit-print-color-adjust:exact;}
-      .no-print{display:none!important;}
-    }
-  </style>
-  </head><body><div class="page">`;
-
-  // ── HEADER ──
+  const vd=dayPlan.filter(d=>d.type==='visit'),totalStops=vd.reduce((s,d)=>s+d.stops.length,0),cities=[...new Set(vd.map(d=>d.city))];
   const fmtDate=d=>d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
-  const endDate=new Date(startDate); endDate.setDate(endDate.getDate()+dayPlan.length-1);
-  bodyHtml+=`
-  <div class="header">
-    <div class="header-left">
-      <h1>Sequence Surface Route Plan</h1>
-      <p>Salesman: <b>${name}</b> &nbsp;|&nbsp; Territory: Tamil Nadu &nbsp;|&nbsp; ${notes||'Sales Tour'}</p>
-    </div>
-    <div class="header-right">
-      <div class="badge">${fmtDate(startDate)} – ${fmtDate(endDate)}</div>
-      <p>Generated: ${fmtDate(new Date())}</p>
-    </div>
-  </div>`;
-
-  // ── SUMMARY ──
-  let totalDist=vd.reduce((s,d)=>s+d.km,0);
-  dayPlan.filter(d=>d.type==='travel').forEach(d=>totalDist+=d.dist);
-  bodyHtml+=`
-  <div class="summary">
-    <div class="sum-box"><div class="val">${dayPlan.length}</div><div class="lbl">Total Days</div></div>
-    <div class="sum-box"><div class="val">${vd.length}</div><div class="lbl">Visit Days</div></div>
-    <div class="sum-box"><div class="val">${totalStops}</div><div class="lbl">Total Stops</div></div>
-    <div class="sum-box"><div class="val">${cities.length}</div><div class="lbl">Cities</div></div>
-    <div class="sum-box"><div class="val">${Math.round(totalDist)}km</div><div class="lbl">Est. Distance</div></div>
-  </div>`;
-
-  // ── DAY BLOCKS ──
+  const endDate=new Date(startDate);endDate.setDate(endDate.getDate()+dayPlan.length-1);
+  let totalDist=vd.reduce((s,d)=>s+d.km,0);dayPlan.filter(d=>d.type==='travel').forEach(d=>totalDist+=d.dist);
   const dayColors=['#1a4db8','#0a7a42','#b85a00','#5b32b5','#b83030','#0a7071','#1a6b3c','#7a4500'];
   let gs=0;
+  let body=`<!DOCTYPE html><html><head><title>Route Plan — ${name}</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#111;background:white;}.page{padding:18mm 16mm;}.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:3px solid #1a2a6c;margin-bottom:16px;}.header h1{font-size:20px;font-weight:800;color:#1a2a6c;}.header h1 span{color:#e07b00;}.header p{font-size:11px;color:#555;margin-top:3px;}.header-r{text-align:right;}.badge{display:inline-block;background:#1a2a6c;color:white;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;margin-bottom:4px;}.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px;padding:12px;background:#f5f7ff;border-radius:8px;border:1px solid #e0e5ff;}.sum-box{text-align:center;}.sum-box .val{font-size:18px;font-weight:800;color:#1a2a6c;}.sum-box .lbl{font-size:9px;color:#888;text-transform:uppercase;margin-top:2px;}.day-card{margin-bottom:12px;border:1px solid #dde2f0;border-radius:8px;overflow:hidden;page-break-inside:avoid;}.dch{display:flex;align-items:center;gap:10px;padding:8px 12px;color:white;}.dnb{width:30px;height:30px;border-radius:6px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;font-family:monospace;}.dhi{flex:1;}.dht{font-size:13px;font-weight:800;}.dhs{font-size:10px;opacity:.85;margin-top:1px;}.dstat{text-align:right;font-size:10px;opacity:.85;}.tcard{margin-bottom:10px;padding:8px 12px;background:#f0f4ff;border:1px dashed #b0bce8;border-radius:6px;display:flex;align-items:center;gap:10px;font-size:11px;}.tcard .tinfo{flex:1;}.tcard .tname{font-weight:700;font-size:12px;color:#1a2a6c;}.tcard .tmeta{font-size:10px;color:#666;margin-top:2px;}.tcard .tdist{font-family:monospace;font-weight:700;color:#1a2a6c;}.tbl{width:100%;border-collapse:collapse;}.tbl th{background:#f5f7ff;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:#555;border-bottom:1px solid #dde2f0;text-align:left;}.tbl td{padding:7px 10px;border-bottom:1px solid #eef0f8;font-size:11px;vertical-align:middle;}.tbl tr:last-child td{border-bottom:none;}.sn{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white;font-family:monospace;}.sb2{display:inline-block;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;text-transform:uppercase;}.ka{background:#fef3c7;color:#92400e;}.ach{background:#d1fae5;color:#065f46;}.act{background:#dbeafe;color:#1e40af;}.ina{background:#fee2e2;color:#991b1b;}.pb{font-size:8px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;padding:1px 5px;border-radius:4px;font-weight:700;}.sg{font-size:8px;background:#d1fae5;color:#065f46;border:1px solid #a7f3d0;padding:1px 5px;border-radius:4px;font-weight:700;}.footer{margin-top:18px;padding-top:10px;border-top:1px solid #dde2f0;display:flex;justify-content:space-between;font-size:10px;color:#aaa;}@page{size:A4;margin:0;}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact;}}</style></head><body><div class="page">`;
+  body+=`<div class="header"><div><h1>Sequence Surface Route Plan</h1><p>Salesman: <b>${name}</b> &nbsp;|&nbsp; Tamil Nadu &nbsp;|&nbsp; ${notes||'Sales Tour'}</p></div><div class="header-r"><div class="badge">${fmtDate(startDate)} – ${fmtDate(endDate)}</div><p style="font-size:10px;color:#777">Generated: ${fmtDate(new Date())}</p></div></div>`;
+  body+=`<div class="summary"><div class="sum-box"><div class="val">${dayPlan.length}</div><div class="lbl">Total Days</div></div><div class="sum-box"><div class="val">${vd.length}</div><div class="lbl">Visit Days</div></div><div class="sum-box"><div class="val">${totalStops}</div><div class="lbl">Stops</div></div><div class="sum-box"><div class="val">${cities.length}</div><div class="lbl">Cities</div></div><div class="sum-box"><div class="val">${Math.round(totalDist)}km</div><div class="lbl">Distance</div></div></div>`;
   dayPlan.forEach((day,di)=>{
-    const dc=dayColors[di%dayColors.length];
-    const curDate=new Date(startDate); curDate.setDate(curDate.getDate()+di);
-    const dayLabel=fmtDate(curDate)+' ('+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][curDate.getDay()]+')';
-
-    if(day.type==='travel'){
-      bodyHtml+=`<div class="travel-card">
-        <div class="mode">${day.mode.split(' ')[0]}</div>
-        <div class="tinfo">
-          <div class="tname">Day ${day.dn} — Travel Day: ${day.from} → ${day.to}</div>
-          <div class="tmeta">${dayLabel} &nbsp;|&nbsp; ${day.mode.split(' ').slice(1).join(' ')} &nbsp;|&nbsp; ~${day.hrs} hours</div>
-        </div>
-        <div class="tdist">${day.dist} km</div>
-      </div>`;
-      return;
-    }
-
-    const pl=day.totalParts>1?` (Part ${day.part}/${day.totalParts})`:'';
-    bodyHtml+=`<div class="day-card">
-      <div class="day-card-hdr" style="background:${dc}">
-        <div class="day-num-box">D${day.dn}</div>
-        <div class="day-hdr-info">
-          <div class="day-hdr-title">Day ${day.dn} — ${day.city}${pl}</div>
-          <div class="day-hdr-sub">${dayLabel}</div>
-        </div>
-        <div class="day-hdr-stats">${day.stops.length} stops · ${day.km}km · ~${(day.mins/60).toFixed(1)}hr</div>
-      </div>
-      <table class="stops-table">
-        <thead><tr><th>#</th><th>Dealer Name</th><th>Zone</th><th>Status</th><th>Type</th><th>Dist.</th></tr></thead>
-        <tbody>`;
-
-    day.stops.forEach((id,si)=>{
-      gs++; const d=MASTER[id];
-      const seg=si>0?hav(day.stops[si-1],id):0;
-      const sCls=d.status==='Key Account'?'ka':d.status==='Achiever'?'ach':d.status==='Inactive'?'ina':'act';
-      const typeBadge=d.planKind==='planned'?'<span class="planned-badge">📋 In List</span>':d.planKind==='suggested'?'<span class="sugg-badge">💡 Nearby</span>':'';
-      bodyHtml+=`<tr>
-        <td><span class="stop-num" style="background:${dc}">${gs}</span></td>
-        <td><b>${d.name}</b><br><span style="font-size:10px;color:#777">${d.city}, ${d.state}</span></td>
-        <td style="color:#555">${d.zone||'—'}</td>
-        <td><span class="status-badge ${sCls}">${d.status}</span></td>
-        <td>${typeBadge}</td>
-        <td style="font-family:monospace;color:#555">${si===0?'Start':'+'+seg.toFixed(1)+'km'}</td>
-      </tr>`;
-    });
-    bodyHtml+=`</tbody></table></div>`;
+    const dc=dayColors[di%dayColors.length];const curDate=new Date(startDate);curDate.setDate(curDate.getDate()+di);const dl=fmtDate(curDate)+' ('+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][curDate.getDay()]+')';
+    if(day.type==='travel'){body+=`<div class="tcard"><div style="font-size:16px">${day.mode.split(' ')[0]}</div><div class="tinfo"><div class="tname">Day ${day.dn} — Travel: ${day.from} → ${day.to}</div><div class="tmeta">${dl} | ${day.mode.split(' ').slice(1).join(' ')} | ~${day.hrs}h</div></div><div class="tdist">${day.dist}km</div></div>`;return;}
+    const pl=day.totalParts>1?` (Pt ${day.part}/${day.totalParts})`:'';
+    body+=`<div class="day-card"><div class="dch" style="background:${dc}"><div class="dnb">D${day.dn}</div><div class="dhi"><div class="dht">Day ${day.dn} — ${day.city}${pl}</div><div class="dhs">${dl}</div></div><div class="dstat">${day.stops.length} stops · ${day.km}km · ~${(day.mins/60).toFixed(1)}hr</div></div><table class="tbl"><thead><tr><th>#</th><th>Dealer Name</th><th>Zone</th><th>Status</th><th>Type</th><th>Dist.</th></tr></thead><tbody>`;
+    day.stops.forEach((id,si)=>{gs++;const d=MASTER[id];const seg=si>0?hav(day.stops[si-1],id):0;const sc=d.status==='Key Account'?'ka':d.status==='Achiever'?'ach':d.status==='Inactive'?'ina':'act';const tb=d.planKind==='planned'?'<span class="pb">📋 In List</span>':d.planKind==='suggested'?'<span class="sg">💡 Nearby</span>':'';body+=`<tr><td><span class="sn" style="background:${dc}">${gs}</span></td><td><b>${d.name}</b><br><span style="font-size:10px;color:#777">${d.city}, ${d.state}</span></td><td style="color:#555">${d.zone||'—'}</td><td><span class="sb2 ${sc}">${d.status}</span></td><td>${tb}</td><td style="font-family:monospace;color:#555">${si===0?'Start':'+'+seg.toFixed(1)+'km'}</td></tr>`;});
+    body+=`</tbody></table></div>`;
   });
-
-  // ── FOOTER ──
-  bodyHtml+=`<div class="footer"><span>Sequence Surface — Sales Route Planner · ${name} · Tamil Nadu</span><span>Generated ${fmtDate(new Date())}</span></div>`;
-  bodyHtml+=`</div></body></html>`;
-
-  // Open print window
-  const w=window.open('','_blank','width=900,height=700');
-  w.document.write(bodyHtml);
-  w.document.close();
-  w.onload=()=>{w.focus();w.print();};
-  closeExportModal();
-  toast('📄 Route plan opened — use Print → Save as PDF');
+  body+=`<div class="footer"><span>Sequence Surface LLP — Route Plan · ${name} · Tamil Nadu</span><span>${fmtDate(new Date())}</span></div></div></body></html>`;
+  const w=window.open('','_blank','width=900,height=700');w.document.write(body);w.document.close();w.onload=()=>{w.focus();w.print();};
+  closeExportModal();toast('📄 Print → Save as PDF');
 }
 
 /* ══ FOOTER / NAV ══ */
-function updateNavSel(){document.getElementById('navSel').textContent=picked.size?picked.size+' selected':'0 selected';}
+function updateNavSel(){document.getElementById('navSel').textContent=picked.size?picked.size+' sel':'0 sel';}
 function updateFooter(){
   const n=picked.size,btn=document.getElementById('planBtn'),st=document.getElementById('fselText'),bd=document.getElementById('fselCities');
-  if(n===0){st.innerHTML='Download template, fill it, then upload';btn.disabled=true;}
-  else if(n===1){st.innerHTML='<b>1</b> selected — need at least 2';btn.disabled=true;}
+  if(n===0){st.innerHTML='Download template, fill, then upload';btn.disabled=true;}
+  else if(n===1){st.innerHTML='<b>1</b> selected — need 2+';btn.disabled=true;}
   else{st.innerHTML=`<b>${n} dealers</b> selected`;btn.disabled=false;}
   if(n>0){const bc={};picked.forEach(id=>{const c=MASTER[id].city;bc[c]=(bc[c]||0)+1;});bd.textContent=Object.entries(bc).map(([c,v])=>`${c.charAt(0)+c.slice(1).toLowerCase()}:${v}`).join(' · ');}
   else bd.textContent='';
 }
 
 /* ══ QUICK SELECTS ══ */
-function selPlanned(){MASTER.filter(d=>d.planKind==='planned').forEach(d=>picked.add(d.id));if(dayPlan.length)resetPlan();refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();toast('📋 All planned parties selected');}
+function selPlanned(){MASTER.filter(d=>d.planKind==='planned').forEach(d=>picked.add(d.id));if(dayPlan.length)resetPlan();refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();toast('📋 Planned parties selected');}
 function selAllVisible(){const vis=getVisible(),all=vis.every(d=>picked.has(d.id));vis.forEach(d=>all?picked.delete(d.id):picked.add(d.id));if(dayPlan.length)resetPlan();refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();}
 function togCity(city,all){getVisible().filter(d=>d.city===city).forEach(d=>all?picked.delete(d.id):picked.add(d.id));if(dayPlan.length)resetPlan();refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();}
 function clearAll(){picked.clear();resetPlan();refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();document.getElementById('exportBtn').style.display='none';toast('Cleared');}
 function resetPlan(){dayPlan=[];flatRoute=[];polys.forEach(p=>p.remove());polys=[];arrMkrs.forEach(a=>a.remove());arrMkrs=[];document.getElementById('rsum').style.display='none';document.getElementById('rpanel').style.display='none';document.getElementById('navDays').style.display='none';}
 function toggleLeg(){const l=document.getElementById('legend');l.style.display=l.style.display==='none'?'block':'none';}
 function fitView(){const pts=MASTER.map(d=>[d.lat,d.lng]);if(pts.length)map.fitBounds(L.latLngBounds(pts).pad(.12));}
-function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);}
 
 /* ══ FILTER CHIPS ══ */
 document.querySelectorAll('[data-pf]').forEach(c=>c.addEventListener('click',()=>{document.querySelectorAll('[data-pf]').forEach(x=>x.classList.remove('on'));c.classList.add('on');planF=c.dataset.pf;renderList();refreshMkrs();}));
 document.querySelectorAll('[data-sf]').forEach(c=>c.addEventListener('click',()=>{document.querySelectorAll('[data-sf]').forEach(x=>x.classList.remove('on'));c.classList.add('on');statusF=c.dataset.sf;renderList();refreshMkrs();}));
 
+/* ══ RESIZE HANDLER ══ */
+window.addEventListener('resize',()=>{
+  if(!isMobile()){
+    // On resize to desktop, close mobile sheet and sidebar if open
+    document.getElementById('bottomSheet').classList.remove('show');
+    document.getElementById('sheetOverlay').classList.remove('show');
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sbOverlay').classList.remove('show');
+  }
+  map.invalidateSize();
+});
+
 /* ══ INIT ══ */
 document.getElementById('navTotal').textContent=MASTER.length+' dealers';
 buildCityTabs();refreshMkrs();renderList();updateNavSel();
-setTimeout(()=>toast('⬇ Download the template, delete parties you don\'t need, then upload to plan!'),800);
+setTimeout(()=>toast('⬇ Download template → delete rows → upload to plan route'),900);
 </script>
 </body>
 </html>
