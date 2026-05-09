@@ -342,7 +342,7 @@ nav{height:var(--nav-h);background:var(--sf);border-bottom:1px solid var(--b2);d
       <span id="fselText">Download template, fill, then upload</span>
       <span class="fsub" id="fselCities"></span>
     </div>
-    <button class="planbtn" id="planBtn" onclick="planRoute();closeSidebar();" disabled>📅 Plan Day-wise Route</button>
+    <button class="planbtn" id="planBtn" onclick="openStartModal()" disabled>📅 Plan Day-wise Route</button>
     <div class="f2">
       <button class="fbtn" onclick="selPlanned()">📋 Planned</button>
       <button class="fbtn" onclick="selAllVisible()">☑ All</button>
@@ -353,7 +353,8 @@ nav{height:var(--nav-h);background:var(--sf);border-bottom:1px solid var(--b2);d
 <div class="main">
   <div class="mtb">
     <div class="tbl">
-      <button class="mbtn primary" onclick="planRoute();closeSidebar();">📅 Plan</button>
+      <button class="mbtn primary" onclick="openStartModal()">📅 Plan</button>
+      <button class="mbtn" id="startBtn" onclick="openStartModal()" style="border-color:rgba(15,212,122,.4);color:var(--gn)" title="Set starting point">📍 Start</button>
       <button class="mbtn export" id="exportBtn" onclick="openExportModal()" style="display:none">📄 PDF</button>
       <button class="mbtn" onclick="clearAll()">✕</button>
     </div>
@@ -372,11 +373,13 @@ nav{height:var(--nav-h);background:var(--sf);border-bottom:1px solid var(--b2);d
     </div>
     <div class="ovl" id="legend">
       <div class="leg-t">Legend</div>
+      <div class="leg-i"><div style="width:20px;height:20px;border-radius:50%;background:#22c55e;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">🏠</div>Starting Point</div>
       <div class="leg-i"><div class="leg-d" style="background:var(--am);box-shadow:0 0 0 3px rgba(245,166,35,.35)"></div>From your list</div>
       <div class="leg-i"><div class="leg-d" style="background:var(--gn);box-shadow:0 0 0 3px rgba(15,212,122,.3)"></div>Nearby suggestion</div>
-      <div class="leg-i"><div class="leg-d" style="background:#4f7fff"></div>Normal dealer</div>
+      <div class="leg-i"><div class="leg-d" style="background:#4f7fff"></div>Route stop</div>
       <div class="leg-s"></div>
-      <div class="leg-i" style="font-size:10px">⚪ Selected · 🔢 Stop#</div>
+      <div class="leg-i" style="font-size:10px">🔢 Stop number (colored by day)</div>
+      <div class="leg-i" style="font-size:10px;color:var(--t3)">Non-route dots hidden during plan</div>
     </div>
     <div class="ovl" id="rsum">
       <div class="ri"><div class="rv" id="rsDays">—</div><div class="rl">Days</div></div>
@@ -405,6 +408,38 @@ nav{height:var(--nav-h);background:var(--sf);border-bottom:1px solid var(--b2);d
     <div class="modal-btns">
       <button class="modal-btn" onclick="closeExportModal()">Cancel</button>
       <button class="modal-btn primary" onclick="exportPDF()">⬇ Download PDF</button>
+    </div>
+  </div>
+</div>
+<!-- START POINT MODAL -->
+<div class="modal-bg" id="startModal">
+  <div class="modal">
+    <div class="modal-title">📍 Set Starting Point</div>
+    <div class="modal-sub">Where does your salesman start from? Route will be optimised from this location.</div>
+    <div class="modal-section">
+      <div class="modal-label">Starting Location Name</div>
+      <input class="modal-input" id="startName" placeholder="e.g. Office, Home, Hotel…" value="Office / Home Base">
+    </div>
+    <div class="modal-section">
+      <div class="modal-label">City</div>
+      <input class="modal-input" id="startCity" placeholder="e.g. Bangalore" list="cityList">
+      <datalist id="cityList"></datalist>
+    </div>
+    <div class="modal-section" style="display:flex;gap:8px">
+      <div style="flex:1">
+        <div class="modal-label">Latitude</div>
+        <input class="modal-input" id="startLat" placeholder="e.g. 12.9716" type="number" step="any">
+      </div>
+      <div style="flex:1">
+        <div class="modal-label">Longitude</div>
+        <input class="modal-input" id="startLng" placeholder="e.g. 77.5946" type="number" step="any">
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--t3);margin-top:-8px;margin-bottom:4px">Leave blank to auto-detect from city name, or click map to pin.</div>
+    <div id="startPresetRow" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px"></div>
+    <div class="modal-btns">
+      <button class="modal-btn" onclick="closeStartModal()">Skip (auto)</button>
+      <button class="modal-btn primary" onclick="confirmStartPoint()">✓ Set &amp; Plan Route</button>
     </div>
   </div>
 </div>
@@ -2541,6 +2576,8 @@ let dayPlan=[], flatRoute=[];
 let mkrs=[], polys=[], arrMkrs=[];
 let curDP=-1, pendingUpload=null;
 let allCities=[], filteredMaster=MASTER;
+let startPoint=null;    // {name, lat, lng, city} — null = no start set
+let startMkr=null;      // leaflet marker for start point
 
 // ─── MAP
 const map=L.map('map',{zoomControl:false}).setView([13.0,78.0],6);
@@ -2649,19 +2686,6 @@ function getNearby(id,lim=5){return MASTER.filter(d=>d.id!==id).map(d=>({...d,_d
 function nn(ids){if(!ids.length)return[];let cur=ids[0];const vis=new Set([cur]),res=[cur];while(vis.size<ids.length){let best=-1,bd=Infinity;for(const id of ids)if(!vis.has(id)){const dd=hav(cur,id);if(dd<bd){bd=dd;best=id;}}if(best<0)break;vis.add(best);res.push(best);cur=best;}return res;}
 
 // ─── DAY PLANNING
-function buildPlan(ids){
-  const byCity={};ids.forEach(id=>{const c=MASTER[id].city;if(!byCity[c])byCity[c]=[];byCity[c].push(id);});
-  const cdArr=Object.entries(byCity).map(([city,cids])=>({city,ids:nn(cids)}));
-  const sorted=sortCities(cdArr);const days=[];let dn=1,prevCC=null;
-  sorted.forEach((cd,ci)=>{
-    const anchor=MASTER[cd.ids[0]];
-    if(prevCC){const dist=havXY(prevCC[0],prevCC[1],anchor.lat,anchor.lng);if(dist>TRAVEL_KM){const mode=dist>500?'✈️ Flight':dist>150?'🚆 Train':'🚗 Drive';const hrs=dist>500?2:Math.round(dist/(dist>150?90:60));days.push({dn,type:'travel',from:sorted[ci-1].city,to:cd.city,dist:Math.round(dist),mode,hrs});dn++;}}
-    for(let i=0;i<cd.ids.length;i+=MAX_DAY){const chunk=cd.ids.slice(i,i+MAX_DAY);let km=0;for(let j=0;j<chunk.length-1;j++)km+=hav(chunk[j],chunk[j+1]);const mins=chunk.length*35+Math.round(km*3);const parts=Math.ceil(cd.ids.length/MAX_DAY);days.push({dn,type:'visit',city:cd.city,stops:chunk,km:+km.toFixed(1),mins,part:parts>1?i/MAX_DAY+1:0,totalParts:parts});dn++;}
-    prevCC=[anchor.lat,anchor.lng];
-  });
-  return days;
-}
-function sortCities(arr){if(arr.length<=1)return arr;const rem=[...arr];let si=0;rem.forEach((c,i)=>{if(MASTER[c.ids[0]].lat<MASTER[rem[si].ids[0]].lat)si=i;});const res=[rem.splice(si,1)[0]];while(rem.length){const ll=MASTER[res[res.length-1].ids[0]];let bi=0,bd=Infinity;rem.forEach((c,i)=>{const dd=havXY(ll.lat,ll.lng,MASTER[c.ids[0]].lat,MASTER[c.ids[0]].lng);if(dd<bd){bd=dd;bi=i;}});res.push(rem.splice(bi,1)[0]);}return res;}
 
 // ─── MARKERS
 function getSD(id){for(const day of dayPlan){if(day.type!=='visit')continue;const pos=day.stops.indexOf(id);if(pos>=0){let cum=0;for(const dd of dayPlan){if(dd.type==='visit'&&dd.dn<day.dn)cum+=dd.stops.length;}return{gs:cum+pos+1,dn:day.dn,dc:DAY_COLORS[(day.dn-1)%DAY_COLORS.length]};}}return{gs:0,dn:0,dc:null};}
@@ -2678,18 +2702,71 @@ function mkIcon(d,gs,dc,ip){
 
 function refreshMkrs(){
   mkrs.forEach(m=>m.remove());mkrs=[];
-  // Only show visible dealers + planned + picked for performance
-  const vis=new Set(getVisible().map(d=>d.id));
-  MASTER.forEach(d=>{
-    const show=vis.has(d.id)||picked.has(d.id)||d.planKind==='planned'||d.planKind==='suggested';
-    if(!show) return;
-    const sd=getSD(d.id),ip=picked.has(d.id);
-    const zi=sd.dc?3000:d.planKind==='planned'?2500:ip?2000:d.planKind==='suggested'?1500:100;
-    mkrs.push(L.marker([d.lat,d.lng],{icon:mkIcon(d,sd.gs,sd.dc,ip),zIndexOffset:zi}).addTo(map).on('click',()=>openDP(d.id)));
-  });
+  if(startMkr){startMkr.remove();startMkr=null;}
+
+  const routeActive=dayPlan.length>0;
+  const routeIds=new Set(flatRoute);
+
+  if(routeActive){
+    // ── ROUTE MODE: only show route stops + start point. All others hidden.
+    flatRoute.forEach(id=>{
+      const d=MASTER[id],sd=getSD(id),ip=picked.has(id);
+      const zi=3000;
+      mkrs.push(L.marker([d.lat,d.lng],{icon:mkIcon(d,sd.gs,sd.dc,ip),zIndexOffset:zi}).addTo(map).on('click',()=>openDP(d.id)));
+    });
+    // Draw start point marker
+    if(startPoint){
+      const icon=L.divIcon({html:`<div style="width:32px;height:32px;background:#22c55e;border:3px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 0 0 3px #22c55e88,0 3px 16px rgba(0,0,0,.8)">🏠</div>`,className:'',iconAnchor:[16,16],iconSize:[32,32]});
+      startMkr=L.marker([startPoint.lat,startPoint.lng],{icon,zIndexOffset:5000}).addTo(map);
+      startMkr.bindTooltip(`<b>Start: ${startPoint.name}</b>`,{permanent:false,direction:'top'});
+    }
+  } else {
+    // ── BROWSE MODE: show visible dealers + planned + picked
+    const vis=new Set(getVisible().map(d=>d.id));
+    MASTER.forEach(d=>{
+      const show=vis.has(d.id)||picked.has(d.id)||d.planKind==='planned'||d.planKind==='suggested';
+      if(!show) return;
+      const sd=getSD(d.id),ip=picked.has(d.id);
+      const zi=d.planKind==='planned'?2500:ip?2000:d.planKind==='suggested'?1500:100;
+      mkrs.push(L.marker([d.lat,d.lng],{icon:mkIcon(d,sd.gs,sd.dc,ip),zIndexOffset:zi}).addTo(map).on('click',()=>openDP(d.id)));
+    });
+    // Show start point if set (even without plan)
+    if(startPoint){
+      const icon=L.divIcon({html:`<div style="width:28px;height:28px;background:#22c55e;border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 0 0 3px #22c55e66,0 2px 10px rgba(0,0,0,.6)">🏠</div>`,className:'',iconAnchor:[14,14],iconSize:[28,28]});
+      startMkr=L.marker([startPoint.lat,startPoint.lng],{icon,zIndexOffset:5000}).addTo(map);
+      startMkr.bindTooltip(`<b>Start: ${startPoint.name}</b>`,{permanent:false,direction:'top'});
+    }
+  }
 }
 
-function drawRoutes(){polys.forEach(p=>p.remove());polys=[];arrMkrs.forEach(a=>a.remove());arrMkrs=[];dayPlan.forEach((day,di)=>{if(day.type!=='visit')return;const col=DAY_COLORS[di%DAY_COLORS.length];const pts=day.stops.map(id=>[MASTER[id].lat,MASTER[id].lng]);if(pts.length<2)return;polys.push(L.polyline(pts,{color:col,weight:3,opacity:.9,dashArray:'8 4'}).addTo(map));for(let i=0;i<pts.length-1;i++){const mid=[(pts[i][0]+pts[i+1][0])/2,(pts[i][1]+pts[i+1][1])/2];const ang=Math.atan2(pts[i+1][1]-pts[i][1],pts[i+1][0]-pts[i][0])*180/Math.PI;arrMkrs.push(L.marker(mid,{icon:L.divIcon({html:`<div style="color:${col};font-size:11px;transform:rotate(${ang}deg);opacity:.9;line-height:1">▶</div>`,className:'',iconAnchor:[6,6]})}).addTo(map));}});const vd=dayPlan.filter(d=>d.type==='visit');for(let i=0;i<vd.length-1;i++){if(vd[i].city!==vd[i+1].city){const a=MASTER[vd[i].stops[0]],b=MASTER[vd[i+1].stops[0]];polys.push(L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#4f7fff',weight:1.5,opacity:.35,dashArray:'4 6'}).addTo(map));}}}
+function drawRoutes(){
+  polys.forEach(p=>p.remove());polys=[];arrMkrs.forEach(a=>a.remove());arrMkrs=[];
+  dayPlan.forEach((day,di)=>{
+    if(day.type!=='visit') return;
+    const col=DAY_COLORS[di%DAY_COLORS.length];
+    const pts=day.stops.map(id=>[MASTER[id].lat,MASTER[id].lng]);
+    if(pts.length<2) return;
+    polys.push(L.polyline(pts,{color:col,weight:3,opacity:.9,dashArray:'8 4'}).addTo(map));
+    for(let i=0;i<pts.length-1;i++){
+      const mid=[(pts[i][0]+pts[i+1][0])/2,(pts[i][1]+pts[i+1][1])/2];
+      const ang=Math.atan2(pts[i+1][1]-pts[i][1],pts[i+1][0]-pts[i][0])*180/Math.PI;
+      arrMkrs.push(L.marker(mid,{icon:L.divIcon({html:`<div style="color:${col};font-size:11px;transform:rotate(${ang}deg);opacity:.9;line-height:1">▶</div>`,className:'',iconAnchor:[6,6]})}).addTo(map));
+    }
+  });
+  // Inter-city dashed connector
+  const vd=dayPlan.filter(d=>d.type==='visit');
+  for(let i=0;i<vd.length-1;i++){
+    if(vd[i].city!==vd[i+1].city){
+      const a=MASTER[vd[i].stops[0]],b=MASTER[vd[i+1].stops[0]];
+      polys.push(L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#4f7fff',weight:1.5,opacity:.35,dashArray:'4 6'}).addTo(map));
+    }
+  }
+  // Start point → first stop line
+  if(startPoint && vd.length>0 && vd[0].stops.length>0){
+    const first=MASTER[vd[0].stops[0]];
+    polys.push(L.polyline([[startPoint.lat,startPoint.lng],[first.lat,first.lng]],{color:'#22c55e',weight:2.5,opacity:.8,dashArray:'6 5'}).addTo(map));
+  }
+}
 
 // ─── DETAIL PANEL
 function buildDPContent(id){
@@ -2820,22 +2897,153 @@ function _renderList(){
   list.innerHTML=html;updateFooter();updateCityTabs();
 }
 
+// ─── START POINT MODAL
+const CITY_COORDS={
+  BANGALORE:{lat:12.9716,lng:77.5946},CHENNAI:{lat:13.0827,lng:80.2707},
+  HYDERABAD:{lat:17.3850,lng:78.4867},ERNAKULAM:{lat:9.9312,lng:76.2673},
+  COIMBATORE:{lat:11.0168,lng:76.9558},BELAGAVI:{lat:15.8497,lng:74.4977},
+  MYSORE:{lat:12.2958,lng:76.6394},KOZHIKODE:{lat:11.2588,lng:75.7804},
+  THRISSUR:{lat:10.5276,lng:76.2144},MANGALURU:{lat:12.9141,lng:74.8560},
+  MUMBAI:{lat:19.0760,lng:72.8777},HUBLI:{lat:15.3647,lng:75.1240},
+  SURAT:{lat:21.1702,lng:72.8311},ERODE:{lat:11.3410,lng:77.7172},
+  SALEM:{lat:11.6643,lng:78.1460},MADURAI:{lat:9.9252,lng:78.1198},
+  VIJAYAWADA:{lat:16.5062,lng:80.6480},AHMEDABAD:{lat:23.0225,lng:72.5714},
+};
+
+function openStartModal(){
+  if(picked.size<2){toast('Select at least 2 dealers first');return;}
+  // Populate city datalist
+  const cities=[...new Set(MASTER.map(d=>d.city))].sort();
+  document.getElementById('cityList').innerHTML=cities.map(c=>`<option value="${c}">`).join('');
+  // Preset buttons from top cities in selection
+  const bc={};picked.forEach(id=>{const c=MASTER[id].city;bc[c]=(bc[c]||0)+1;});
+  const topCities=Object.entries(bc).sort((a,b)=>b[1]-a[1]).slice(0,5).map(e=>e[0]);
+  document.getElementById('startPresetRow').innerHTML=topCities.map(c=>{
+    const col=cityColor(c);
+    return `<button onclick="presetCity('${c}')" style="padding:3px 10px;border-radius:10px;background:${col}22;border:1px solid ${col}44;color:${col};font-size:10px;font-family:var(--fn);cursor:pointer">${c.charAt(0)+c.slice(1).toLowerCase()}</button>`;
+  }).join('');
+  // Pre-fill if start already set
+  if(startPoint){
+    document.getElementById('startName').value=startPoint.name;
+    document.getElementById('startCity').value=startPoint.city||'';
+    document.getElementById('startLat').value=startPoint.lat||'';
+    document.getElementById('startLng').value=startPoint.lng||'';
+  }
+  document.getElementById('startModal').classList.add('show');
+}
+
+function presetCity(city){
+  document.getElementById('startCity').value=city;
+  const cc=CITY_COORDS[city];
+  if(cc){document.getElementById('startLat').value=cc.lat;document.getElementById('startLng').value=cc.lng;}
+}
+
+function closeStartModal(){
+  document.getElementById('startModal').classList.remove('show');
+}
+
+function confirmStartPoint(){
+  const name=document.getElementById('startName').value.trim()||'Start';
+  const city=document.getElementById('startCity').value.trim().toUpperCase();
+  let lat=parseFloat(document.getElementById('startLat').value);
+  let lng=parseFloat(document.getElementById('startLng').value);
+  // Auto-fill coords from city if not provided
+  if((!lat||!lng)&&city){
+    const cc=CITY_COORDS[city];
+    if(cc){lat=cc.lat;lng=cc.lng;}
+  }
+  if(!lat||!lng){
+    // Use centroid of selected dealers as fallback
+    const ids=[...picked];
+    lat=ids.reduce((s,id)=>s+MASTER[id].lat,0)/ids.length;
+    lng=ids.reduce((s,id)=>s+MASTER[id].lng,0)/ids.length;
+  }
+  startPoint={name,city,lat:+lat.toFixed(6),lng:+lng.toFixed(6)};
+  closeStartModal();
+  planRoute();
+  closeSidebar();
+}
+
 // ─── PLAN ROUTE
 function planRoute(){
   if(picked.size<2){toast('Select at least 2 dealers to plan a route');return;}
-  dayPlan=buildPlan([...picked]);flatRoute=dayPlan.filter(d=>d.type==='visit').flatMap(d=>d.stops);
+  const ids=[...picked];
+  dayPlan=buildPlanWithStart(ids);
+  flatRoute=dayPlan.filter(d=>d.type==='visit').flatMap(d=>d.stops);
   drawRoutes();refreshMkrs();renderList();renderRP();updateSum();
-  const pts=[...picked].map(id=>[MASTER[id].lat,MASTER[id].lng]);if(pts.length>1)map.fitBounds(L.latLngBounds(pts).pad(.1));
+  // Fit map to route + start point
+  const pts=flatRoute.map(id=>[MASTER[id].lat,MASTER[id].lng]);
+  if(startPoint) pts.push([startPoint.lat,startPoint.lng]);
+  if(pts.length>1) map.fitBounds(L.latLngBounds(pts).pad(.1));
   const td=dayPlan.length,vd=dayPlan.filter(d=>d.type==='visit').length;
-  document.getElementById('navDays').style.display='flex';document.getElementById('navDays').textContent=`${td} day trip`;
+  document.getElementById('navDays').style.display='flex';
+  document.getElementById('navDays').textContent=`${td} day trip`;
   document.getElementById('exportBtn').style.display='flex';
-  toast(`✅ ${picked.size} stops · ${td} days (${vd} visit days)`);
+  const spTxt=startPoint?` from ${startPoint.name}`:'';
+  toast(`✅ ${picked.size} stops · ${td} days${spTxt}`);
+}
+
+// ─── BUILD PLAN (start-point-aware)
+function buildPlanWithStart(ids){
+  const byCity={};ids.forEach(id=>{const c=MASTER[id].city;if(!byCity[c])byCity[c]=[];byCity[c].push(id);});
+  const cdArr=Object.entries(byCity).map(([city,cids])=>({city,ids:nnFromStart(cids)}));
+  const sorted=sortCitiesFromStart(cdArr);
+  const days=[];let dn=1,prevCC=null;
+  sorted.forEach((cd,ci)=>{
+    const anchor=MASTER[cd.ids[0]];
+    if(prevCC){const dist=havXY(prevCC[0],prevCC[1],anchor.lat,anchor.lng);if(dist>TRAVEL_KM){const mode=dist>500?'✈️ Flight':dist>150?'🚆 Train':'🚗 Drive';const hrs=dist>500?2:Math.round(dist/(dist>150?90:60));days.push({dn,type:'travel',from:sorted[ci-1].city,to:cd.city,dist:Math.round(dist),mode,hrs});dn++;}}
+    for(let i=0;i<cd.ids.length;i+=MAX_DAY){const chunk=cd.ids.slice(i,i+MAX_DAY);let km=0;for(let j=0;j<chunk.length-1;j++)km+=hav(chunk[j],chunk[j+1]);const mins=chunk.length*35+Math.round(km*3);const parts=Math.ceil(cd.ids.length/MAX_DAY);days.push({dn,type:'visit',city:cd.city,stops:chunk,km:+km.toFixed(1),mins,part:parts>1?i/MAX_DAY+1:0,totalParts:parts});dn++;}
+    prevCC=[anchor.lat,anchor.lng];
+  });
+  return days;
+}
+
+// TSP starting from nearest to startPoint (or highest-score if no start)
+function nnFromStart(ids){
+  if(!ids.length) return [];
+  let cur;
+  if(startPoint){
+    // pick the dealer in this set closest to startPoint
+    let bd=Infinity;
+    ids.forEach(id=>{
+      const d=MASTER[id];
+      const dist=havXY(startPoint.lat,startPoint.lng,d.lat,d.lng);
+      if(dist<bd){bd=dist;cur=id;}
+    });
+  } else {
+    cur=ids[0]; // fallback
+  }
+  const vis=new Set([cur]),res=[cur];
+  while(vis.size<ids.length){let best=-1,bd=Infinity;for(const id of ids)if(!vis.has(id)){const dd=hav(cur,id);if(dd<bd){bd=dd;best=id;}}if(best<0)break;vis.add(best);res.push(best);cur=best;}
+  return res;
+}
+
+// Sort city order starting from closest city to startPoint
+function sortCitiesFromStart(arr){
+  if(arr.length<=1) return arr;
+  const rem=[...arr];
+  let si=0;
+  if(startPoint){
+    let bd=Infinity;
+    rem.forEach((c,i)=>{
+      const d=MASTER[c.ids[0]];
+      const dist=havXY(startPoint.lat,startPoint.lng,d.lat,d.lng);
+      if(dist<bd){bd=dist;si=i;}
+    });
+  } else {
+    rem.forEach((c,i)=>{if(MASTER[c.ids[0]].lat<MASTER[rem[si].ids[0]].lat)si=i;});
+  }
+  const res=[rem.splice(si,1)[0]];
+  while(rem.length){const ll=MASTER[res[res.length-1].ids[0]];let bi=0,bd=Infinity;rem.forEach((c,i)=>{const dd=havXY(ll.lat,ll.lng,MASTER[c.ids[0]].lat,MASTER[c.ids[0]].lng);if(dd<bd){bd=dd;bi=i;}});res.push(rem.splice(bi,1)[0]);}
+  return res;
 }
 
 function renderRP(){
   const rp=document.getElementById('rpanel');if(!dayPlan.length){rp.style.display='none';return;}rp.style.display='block';
-  const vd=dayPlan.filter(d=>d.type==='visit');document.getElementById('rpmeta').textContent=`${dayPlan.length} days · ${vd.reduce((s,d)=>s+d.stops.length,0)} stops`;
-  let gs=0,html='';
+  const vd=dayPlan.filter(d=>d.type==='visit');
+  const spLabel=startPoint?`<div style="display:flex;align-items:center;gap:7px;padding:7px 12px;background:rgba(34,197,94,.08);border-bottom:1px solid rgba(34,197,94,.2)"><div style="font-size:16px">🏠</div><div style="flex:1"><div style="font-size:11px;font-weight:700;color:#22c55e">Starting Point</div><div style="font-size:10px;color:var(--t3)">${startPoint.name}${startPoint.city?` · ${startPoint.city.charAt(0)+startPoint.city.slice(1).toLowerCase()}`:''}</div></div></div>`:'';
+  document.getElementById('rpmeta').textContent=`${dayPlan.length} days · ${vd.reduce((s,d)=>s+d.stops.length,0)} stops`;
+  let gs=0,html=spLabel;
   dayPlan.forEach((day,di)=>{
     const dc=DAY_COLORS[di%DAY_COLORS.length];
     if(day.type==='travel'){html+=`<div class="trseg"><div style="font-size:15px">${day.mode.split(' ')[0]}</div><div class="trinfo"><div class="trroute">Day ${day.dn} — Travel: ${day.from} → ${day.to}</div><div class="trmeta">${day.mode.split(' ').slice(1).join(' ')} · ~${day.hrs}h</div></div><div class="trdist">${day.dist}km</div></div>`;return;}
@@ -2869,7 +3077,8 @@ function exportPDF(){
   const dc2=['#1a4db8','#0a7a42','#b85a00','#5b32b5','#b83030','#0a7071','#1a6b3c','#7a4500'];
   let gs=0;
   let body=`<!DOCTYPE html><html><head><title>Route Plan — ${name}</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#111;}.page{padding:16mm 14mm;}.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:3px solid #1a2a6c;margin-bottom:14px;}.header h1{font-size:19px;font-weight:800;color:#1a2a6c;}.header p{font-size:11px;color:#555;margin-top:3px;}.header-r{text-align:right;}.badge{display:inline-block;background:#1a2a6c;color:white;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;margin-bottom:4px;}.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px;padding:11px;background:#f5f7ff;border-radius:8px;border:1px solid #e0e5ff;}.sum-box{text-align:center;}.sum-box .val{font-size:17px;font-weight:800;color:#1a2a6c;}.sum-box .lbl{font-size:9px;color:#888;text-transform:uppercase;margin-top:2px;}.day-card{margin-bottom:12px;border:1px solid #dde2f0;border-radius:8px;overflow:hidden;page-break-inside:avoid;}.dch{display:flex;align-items:center;gap:10px;padding:8px 12px;color:white;}.dnb{width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;font-family:monospace;}.dhi{flex:1;}.dht{font-size:12px;font-weight:800;}.dhs{font-size:10px;opacity:.85;margin-top:1px;}.dstat{text-align:right;font-size:10px;opacity:.85;}.tcard{margin-bottom:10px;padding:8px 12px;background:#f0f4ff;border:1px dashed #b0bce8;border-radius:6px;display:flex;align-items:center;gap:10px;font-size:11px;}.tcard .tinfo{flex:1;}.tcard .tname{font-weight:700;font-size:12px;color:#1a2a6c;}.tcard .tmeta{font-size:10px;color:#666;margin-top:2px;}.tcard .tdist{font-family:monospace;font-weight:700;color:#1a2a6c;}.tbl{width:100%;border-collapse:collapse;}.tbl th{background:#f5f7ff;padding:6px 8px;font-size:10px;font-weight:700;text-transform:uppercase;color:#555;border-bottom:1px solid #dde2f0;text-align:left;}.tbl td{padding:6px 8px;border-bottom:1px solid #eef0f8;font-size:11px;vertical-align:top;}.tbl tr:last-child td{border-bottom:none;}.sn{width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:white;font-family:monospace;}.pb{font-size:8px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;padding:1px 5px;border-radius:4px;font-weight:700;}.sg{font-size:8px;background:#d1fae5;color:#065f46;border:1px solid #a7f3d0;padding:1px 5px;border-radius:4px;font-weight:700;}.footer{margin-top:16px;padding-top:10px;border-top:1px solid #dde2f0;display:flex;justify-content:space-between;font-size:10px;color:#aaa;}@page{size:A4;margin:0;}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact;}}</style></head><body><div class="page">`;
-  body+=`<div class="header"><div><h1>Sequence Surface Route Plan</h1><p>Salesman: <b>${name}</b> &nbsp;|&nbsp; ${notes}</p></div><div class="header-r"><div class="badge">${fmtDate(startDate)} – ${fmtDate(endDate)}</div><p style="font-size:10px;color:#777">Generated: ${fmtDate(new Date())}</p></div></div>`;
+  const spStr=startPoint?' &nbsp;|&nbsp; Start: <b>'+startPoint.name+'</b>'+(startPoint.city?' ('+startPoint.city.charAt(0)+startPoint.city.slice(1).toLowerCase()+')':''):'';
+  body+=`<div class="header"><div><h1>Sequence Surface Route Plan</h1><p>Salesman: <b>${name}</b>${spStr} &nbsp;|&nbsp; ${notes}</p></div><div class="header-r"><div class="badge">${fmtDate(startDate)} – ${fmtDate(endDate)}</div><p style="font-size:10px;color:#777">Generated: ${fmtDate(new Date())}</p></div></div>`;
   body+=`<div class="summary"><div class="sum-box"><div class="val">${dayPlan.length}</div><div class="lbl">Total Days</div></div><div class="sum-box"><div class="val">${vd.length}</div><div class="lbl">Visit Days</div></div><div class="sum-box"><div class="val">${totalStops}</div><div class="lbl">Stops</div></div><div class="sum-box"><div class="val">${cities.length}</div><div class="lbl">Cities</div></div><div class="sum-box"><div class="val">${Math.round(totalDist)}km</div><div class="lbl">Distance</div></div></div>`;
   dayPlan.forEach((day,di)=>{
     const dc=dc2[di%dc2.length];const curDate=new Date(startDate);curDate.setDate(curDate.getDate()+di);const dl=fmtDate(curDate)+' ('+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][curDate.getDay()]+')';
@@ -2899,8 +3108,8 @@ function updateFooter(){
 function selPlanned(){MASTER.filter(d=>d.planKind==='planned').forEach(d=>picked.add(d.id));if(dayPlan.length)resetPlan();refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();toast('📋 Planned parties selected');}
 function selAllVisible(){const vis=getVisible(),all=vis.every(d=>picked.has(d.id));vis.forEach(d=>all?picked.delete(d.id):picked.add(d.id));if(dayPlan.length)resetPlan();refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();}
 function togCity(city,all){getVisible().filter(d=>d.city===city).forEach(d=>all?picked.delete(d.id):picked.add(d.id));if(dayPlan.length)resetPlan();refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();}
-function clearAll(){picked.clear();resetPlan();refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();document.getElementById('exportBtn').style.display='none';toast('Cleared');}
-function resetPlan(){dayPlan=[];flatRoute=[];polys.forEach(p=>p.remove());polys=[];arrMkrs.forEach(a=>a.remove());arrMkrs=[];document.getElementById('rsum').style.display='none';document.getElementById('rpanel').style.display='none';document.getElementById('navDays').style.display='none';}
+function clearAll(){picked.clear();startPoint=null;resetPlan();refreshMkrs();renderList();updateSelStrip();updateCityTabs();updateNavSel();document.getElementById('exportBtn').style.display='none';toast('Cleared');}
+function resetPlan(){dayPlan=[];flatRoute=[];polys.forEach(p=>p.remove());polys=[];arrMkrs.forEach(a=>a.remove());arrMkrs=[];if(startMkr){startMkr.remove();startMkr=null;}document.getElementById('rsum').style.display='none';document.getElementById('rpanel').style.display='none';document.getElementById('navDays').style.display='none';}
 function toggleLeg(){const l=document.getElementById('legend');l.style.display=l.style.display==='none'?'block':'none';}
 function fitView(){map.fitBounds([[7.5,72.5],[28.7,88.5]]);}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
