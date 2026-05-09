@@ -280,7 +280,7 @@ nav{height:var(--nav-h);background:var(--sf);border-bottom:1px solid var(--b2);d
       <input type="file" id="fileIn" accept=".csv,.xlsx,.xls" onchange="handleFile(this.files[0])">
       <div class="up-icon">📂</div>
       <div class="up-title">Upload Your Party List</div>
-      <div class="up-sub">Download template → delete parties you don't need → upload to plan</div>
+      <div class="up-sub">Download → delete rows you don't need → upload back. One column: Party Name.</div>
       <div class="up-step">Supports .xlsx · .xls · .csv</div>
     </div>
     <div class="action-row">
@@ -2570,13 +2570,13 @@ function closeSidebar(){if(!isMobile())return;document.getElementById('sidebar')
 // ─── TEMPLATE DOWNLOAD
 function downloadTemplate(){
   const filtered = getVisible();
-  const rows=[['Company Name','City','State','Dealer Zone','User Status','GST','Address']];
-  filtered.forEach(d=>rows.push([d.name,d.city,d.state,d.zone,d.status,d.gst,d.address]));
+  const rows=[['Party Name']];
+  filtered.forEach(d=>rows.push([d.name]));
   const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:45},{wch:14},{wch:12},{wch:10},{wch:12},{wch:18},{wch:50}];
-  XLSX.utils.book_append_sheet(wb,ws,'Dealers');
+  ws['!cols']=[{wch:50}];
+  XLSX.utils.book_append_sheet(wb,ws,'Parties');
   XLSX.writeFile(wb,'Sequence_Party_List.xlsx');
-  toast('📥 Template downloaded! Delete parties you don\'t need, then upload back.');
+  toast('📥 Downloaded! Delete parties you don\'t need, then upload back.');
 }
 
 // ─── FILE UPLOAD
@@ -2598,8 +2598,9 @@ function handleFile(file){
 }
 
 function parseUpload(rows){
+  // Always read first column regardless of header name
   const keys=Object.keys(rows[0]||{});
-  const nameK=keys.find(k=>/company|dealer|name|party|account/i.test(k))||keys[0];
+  const nameK=keys[0];
   const names=rows.map(r=>String(r[nameK]||'').trim()).filter(Boolean);
   const matched=[],unmatched=[];
   names.forEach(raw=>{
